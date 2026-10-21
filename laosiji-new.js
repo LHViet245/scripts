@@ -1,15 +1,13 @@
 // ==UserScript==
 // @name         JAV Lái Xe - Mới
 // @namespace    https://github.com/LHViet245/scripts
-// @version      2.9.4.4-vi
+// @version      2.9.4.5-vi
 // @description  Tăng cường duyệt web và quản lý tài nguyên JAV: Thống nhất nhận diện mã phim, thao tác trang chi tiết và danh sách trên JavBus, JavDB, JavLibrary, hỗ trợ tùy chỉnh tỷ lệ bố cục; cung cấp tổng hợp magnet, khớp phát 115, đổi tên và xóa trên 115, phát phim đầy đủ, tải và xem trailer đa độ phân giải, ảnh xem trước, tải ảnh bìa 2K HD, ảnh bìa JavDB không watermark, chuyển hướng tìm kiếm liên trang, dịch tiêu đề, bố cục thẻ, thu phóng trang, thích ứng di động, xem ảnh phim, cuộn vô tận và sắp xếp theo điểm/đánh giá JavDB; hỗ trợ Trung tâm quản lý tài nguyên độc lập cho từng phân trang JavBus, JavDB, JavLibrary, thao tác hàng loạt diễn viên, tác phẩm, lịch sử đánh giá, danh sách đen cùng sao lưu/khôi phục cục bộ/WebDAV, và cung cấp lối tắt truy cập nhanh cho Sukebei, MissAV, Jable, 123AV, Emby và các trang khác.
 // @author       ZiPenOk
 // @icon         https://cloudflare-imgbed-5nw.pages.dev/file/1778560196416_laosiji.png
 // @match        https://www.javlibrary.com/*
 // @match        https://www.javbus.com/*
 // @match        https://javdb.com/*
-// @match        https://115.com/*
-// @match        https://www.115.com/*
 // @match        https://sukebei.nyaa.si/*
 // @match        https://sehuatang.net/*
 // @match        https://supjav.com/*
@@ -75,7 +73,7 @@
    return url.searchParams.get('laosiji_123av_fc2') === '1';
   } catch (_) { return false; } }
  function isCustomSpaUrl(urlLike) { return isJavdbCustomSpaUrl(urlLike) || is123AvFc2SpaUrl(urlLike); }
- const SCRIPT_VERSION = '2.9.4.4-vi'; const DEBUG_LOG = false; const ERROR_LOG = true; const PAGE_ZOOM_DEFAULT = 86; const PAGE_ZOOM_LOW_RES_DEFAULT = 100; const PAGE_ZOOM_2K_WIDTH = 2560;
+ const SCRIPT_VERSION = '2.9.4.5-vi'; const DEBUG_LOG = false; const ERROR_LOG = true; const PAGE_ZOOM_DEFAULT = 86; const PAGE_ZOOM_LOW_RES_DEFAULT = 100; const PAGE_ZOOM_2K_WIDTH = 2560;
  const getPageZoomDefault = () => {
   const screenLongSide = Math.max(window.screen?.width || 0, window.screen?.height || 0); return screenLongSide && screenLongSide < PAGE_ZOOM_2K_WIDTH ? PAGE_ZOOM_LOW_RES_DEFAULT : PAGE_ZOOM_DEFAULT; };
  const JAVDB_REVIEW_INITIAL_LIMIT = 6; const JAVDB_REVIEW_MORE_LIMIT = 20;
@@ -154,7 +152,7 @@
   cardFx: { key: 'card_fx_enabled', def: false, bool: true },
   coverHoverPreview: { key: 'cover_hover_preview_enabled', def: false, bool: true },
   javdbAppCover: { key: 'javdb_app_cover_enabled', def: true, bool: true },
-  pan115CoverHoverPreview: { key: 'pan115_cover_hover_preview_enabled', def: true, bool: true }, };
+  pan115CoverHoverPreview: { key: 'pan115_cover_hover_preview_enabled', def: false, bool: true }, };
  Object.entries(CFG_MAP).forEach(([prop, meta]) => {
   Object.defineProperty(CFG, prop, {
    get() { return normalizeCfgValue(readStoredValue(meta.key, resolveCfgDefault(meta)), meta); },
@@ -381,18 +379,13 @@
   {
    id: 'media',
    label: 'Ảnh xem trước & Ảnh bìa',
-   description: 'Ảnh xem trước danh sách, ảnh bìa khi rê chuột và ảnh bìa 115',
-   prefixes: ['thumb_cache_', 'pan115_javdb_cover_v1_', 'pan115_cover_v2_', 'pan115_cover_v3_', 'pan115_cover_v4_'], },
+   description: 'Ảnh xem trước danh sách và ảnh bìa khi rê chuột',
+   prefixes: ['thumb_cache_'], },
   {
    id: 'trailer',
    label: 'Trailer & Tiến độ phát',
    description: 'Phân tích trailer, tiến độ phát và bản ghi tạm thời nguồn phát thất bại',
    prefixes: ['trailer_cache_', 'trailer_playback_', 'javxy_jp_source_failed_until_'], },
-  {
-   id: 'pan115',
-   label: 'Khớp 115',
-   description: 'Kết quả khớp đơn mục và danh sách trên 115',
-   prefixes: ['pan115_cache_', 'pan115_list_cache_'], },
   {
    id: 'page',
    label: 'Dữ liệu trang',
@@ -2664,150 +2657,12 @@
    const jq = window.jQuery || window.$;
    if (jq && jq(container).masonry) { jq(container).masonry('reloadItems'); jq(container).masonry('layout'); }
    return container; },
-  findPan115TitleTextNode(anchor) {
-   const root = anchor.querySelector('.video-title, .title, [class*="title"], h1, h2, h3, h4, h5, p') || anchor;
-   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) { return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; }
-   });
-   return walker.nextNode(); },
-  getPan115ListCard(anchor) {
-   return anchor?.closest?.([
-    '.video-img-box',
-    '.card',
-    '.video-list-row',
-    '.movie-list .item',
-    '.movies .item',
-    '.grid .item',
-    '#waterfall .item',
-    '.videothumblist .video',
-    '.thumbnail',
-    '.post',
-   ].join(',')) || null; },
-  isMissavListDurationAnchor(anchor, card, visibleTitleHasCode) {
-   if (!/^(?:www\.)?(?:missav\.(?:ws|ai|com|live)|missav123\.com|njavtv\.com)$/i.test(location.hostname)) return false;
-   if (!card?.matches?.('.thumbnail') || visibleTitleHasCode) return false;
-   return !anchor.querySelector('img, video'); },
-  findPan115TitleAnchor(anchor) {
-   if (!anchor || anchor.closest('#jav-resource-overlay, .jav-jump-btn-group, .jav-pan115-badge')) return null;
-   if (anchor.closest('.emby-btn, .emby-badge, .emby-button-group, .emby-javlibrary-list-badge')) return null;
-   const href = anchor.getAttribute('href') || '';
-   if (/^(?:magnet:|javascript:|#)/i.test(href)) return null;
-   const text = [
-    anchor.getAttribute('title'),
-    anchor.getAttribute('aria-label'),
-    anchor.textContent,
-    href,
-   ].filter(Boolean).join(' '); const code = Utils.extractCode(text); const pan115Code = Pan115.extractCode(text, code);
-   if (!code || !pan115Code) return null;
-   const visibleTitle = (anchor.textContent || anchor.getAttribute('title') || '').trim(); const hasTitleText = visibleTitle.length > 0; const visibleTitleHasCode = !!Utils.extractCode(visibleTitle);
-   if (!hasTitleText) return null;
-   const card = this.getPan115ListCard(anchor);
-   if (this.isMissavListDurationAnchor(anchor, card, visibleTitleHasCode)) return null;
-   if (card && anchor.querySelector('img') && !visibleTitleHasCode) {
-    const titleAnchor = card.querySelector('.card__title .card__link[href], .detail .title a[href], h6.title a[href], .video-title a[href], .title a[href]');
-    if (titleAnchor && titleAnchor !== anchor) return null;
-   }
-   const looksLikeVideoLink =
-    /\/v\/\w+/i.test(href) || /(?:^|\/|\.)jav\w+\.html(?:[?#].*)?$/i.test(href) || /\/videos\/[a-z0-9-]+\/?/i.test(href) || /\/(?:[a-z]{2,15}-\d{2,10}|fc2[-_]?ppv[-_]?\d{6,9})\/?$/i.test(href) || /\/(?:[a-z]{2,15}\d{3,6})\/?$/i.test(href) ||
-    /(?:movie|video|detail|view|jav)/i.test(href);
-   const inListContainer = !!anchor.closest('.movie-list, .movies, .grid, #waterfall, .movie-box, .box, .thumbnail, .video-img-box, .card, .video-list, .video-list-row, .section-container, .videothumblist');
-   if (!looksLikeVideoLink && !inListContainer) return null;
-   if (hasTitleText && !visibleTitleHasCode && !looksLikeVideoLink) return null;
-   return { anchor, code: pan115Code }; },
-  collectPan115ListTargets() {
-   if (this.isDetailPage() || document.querySelector('#jav-resource-overlay')) return [];
-   const isSupjavList = /supjav\.com/.test(location.hostname); const isSukebeiList = /(?:^|\.)sukebei\.nyaa\.si$/i.test(location.hostname); const seen = new Set(); const seenCardCodes = new Map(); const targets = [];
-   const pushTarget = target => {
-    if (!target?.anchor || !target.code) return;
-    const card = this.getPan115ListCard(target.anchor) || target.anchor; const normalized = Pan115.normalizeKeepSeparator(target.code) || target.code; let codes = seenCardCodes.get(card);
-    if (!codes) { codes = new Set(); seenCardCodes.set(card, codes); }
-    if (codes.has(normalized)) return;
-    codes.add(normalized); targets.push(target); };
-   if (/^(?:www\.)?fc2cmadb\.com$/i.test(location.hostname)) {
-    document.querySelectorAll('.card').forEach(card => {
-     const codeBadge = card.querySelector('figure > span.absolute.top-0.left-0, figure > span[class*="top-0"][class*="left-0"]');
-     const code = Utils.extractCode(codeBadge?.textContent, { fc2Only: true, allowBareFc2Number: true });
-     if (!code) return;
-     const titleAnchor = card.querySelector('.card-body h2 a[href], h2.card-title a[href]');
-     if (!titleAnchor) return;
-     if (titleAnchor.dataset.pan115Checked === '1') return;
-     titleAnchor.dataset.pan115Checked = '1';
-     pushTarget({ anchor: titleAnchor, code });
-    }); }
-   if (isJavLibraryHost()) {
-    document.querySelectorAll('.videothumblist .video > a[href]:not(.emby-javlibrary-list-badge)').forEach(anchor => {
-     if (seen.has(anchor) || anchor.dataset.pan115Checked === '1') return;
-     if (anchor.closest('.emby-btn, .emby-badge, .emby-button-group, .emby-javlibrary-list-badge')) return;
-     const card = anchor.closest('.video');
-     const text = [
-      card?.querySelector('.id')?.textContent,
-      card?.querySelector('.title')?.textContent,
-      anchor.getAttribute('title'),
-      anchor.href,
-     ].filter(Boolean).join(' '); const code = Utils.extractCode(text); const pan115Code = Pan115.extractCode(text, code);
-     if (!code || !pan115Code) return;
-     seen.add(anchor);
-     pushTarget({ anchor, code: pan115Code });
-    }); }
-   if (isSukebeiList) {
-    document.querySelectorAll('.torrent-list tbody tr td:nth-child(2) a[href*="/view/"]').forEach(anchor => {
-     if (seen.has(anchor) || anchor.dataset.pan115Checked === '1') return;
-     const text = [
-      anchor.getAttribute('title'),
-      anchor.textContent,
-      anchor.getAttribute('href'),
-     ].filter(Boolean).join(' '); const code = Utils.extractCode(text); const pan115Code = Pan115.extractCode(text, code);
-     if (!pan115Code) return;
-     seen.add(anchor);
-     pushTarget({ anchor, code: pan115Code });
-    });
-    if (targets.length) return targets;
-   }
-   const selectors = [ ...(isSupjavList ? ['.post h3 a[href]'] : []),
-    '.card__title .card__link[href]',
-    '.video-img-box .detail .title a[href]',
-    '.video-img-box h6.title a[href]',
-    '.movie-list a[href]',
-    '.videothumblist .video > a[href]:not(.emby-javlibrary-list-badge)',
-    '.movies a[href]',
-    '.grid a[href]',
-    '.item a[href]',
-    '.video-title a[href]',
-    'a.movie-box[href]',
-    'a.box[href]',
-    'a[href*="/v/"]',
-    'a[title][href]', ];
-   document.querySelectorAll(selectors.join(',')).forEach(anchor => {
-    if (seen.has(anchor) || anchor.dataset.pan115Checked === '1') return;
-    if (isSupjavList && !anchor.matches('.post h3 a[href]')) return;
-    seen.add(anchor); const target = this.findPan115TitleAnchor(anchor);
-    if (target) pushTarget(target);
-   });
-   return targets; },
-  insertPan115ListBadge(anchor, hit, code) {
-   const matches = (Array.isArray(hit) ? hit : hit?.pickcode ? [hit] : []).filter(item => item?.pickcode);
-   if (!Pan115.enabled() || !matches.length || !anchor || anchor.dataset.pan115HasBadge === '1') return;
-   if (anchor.matches?.('.emby-javlibrary-list-badge') || anchor.closest?.('.emby-btn, .emby-badge, .emby-button-group, .emby-javlibrary-list-badge')) return;
-   const card = this.getPan115ListCard(anchor); const hasSameBadge = root => !!root && [...root.querySelectorAll('.jav-pan115-badge[data-pickcode]')] .some(badge => matches.some(item => badge.dataset.pickcode === item.pickcode));
-   if (hasSameBadge(card) || (!card && hasSameBadge(anchor.parentElement))) { anchor.dataset.pan115HasBadge = '1'; return; }
-   const title = anchor.querySelector('.title, .video-title');
-   if (title) {
-    const badge = createPan115Badge(matches, code, false); const javlibHeadline = title.querySelector('.javlib-card-headline');
-    if (javlibHeadline) {
-     const footer = title.querySelector('.javlib-card-footer');
-     if (footer) {
-      footer.insertBefore(badge, footer.firstChild);
-     } else { javlibHeadline.insertAdjacentElement('afterend', badge); }
-     anchor.dataset.pan115HasBadge = '1'; return; }
-    const javdbHeadline = title.querySelector('.javdb-card-headline');
-    if (javdbHeadline) { javdbHeadline.insertBefore(badge, javdbHeadline.firstChild); anchor.dataset.pan115HasBadge = '1'; return; }
-    title.insertBefore(badge, title.firstChild); anchor.dataset.pan115HasBadge = '1'; return; }
-   const textNode = this.findPan115TitleTextNode(anchor);
-   if (textNode?.parentNode && anchor.contains(textNode.parentNode)) {
-    const badge = createPan115Badge(matches, code, false); textNode.parentNode.insertBefore(badge, textNode);
-   } else {
-    const badge = createPan115Badge(matches, code, true); anchor.parentNode?.insertBefore(badge, anchor); }
-   anchor.dataset.pan115HasBadge = '1'; },
+  findPan115TitleTextNode(anchor) { return null; },
+  getPan115ListCard(anchor) { return null; },
+  isMissavListDurationAnchor(anchor, card, visibleTitleHasCode) { return false; },
+  findPan115TitleAnchor(anchor) { return null; },
+  collectPan115ListTargets() { return []; },
+  insertPan115ListBadge(anchor, hit, code) {},
   getDetailFeatureSite() { return JumpSites.find(site => site.match(window.location.href)) || null; },
   getDetailCode() {
    const site = this.getDetailFeatureSite();
@@ -3336,358 +3191,33 @@
    }, }, ];
  function getAvailableSearchEngines(code) { return SearchEngines.filter(engine => !engine.isAvailable || engine.isAvailable(code)); }
  const Pan115 = {
-  api: 'https://webapi.115.com/files/search',
-  directApi: 'https://proapi.115.com/app/chrome/downurl',
-  editApi: 'https://webapi.115.com/files/edit',
-  deleteApi: 'https://webapi.115.com/rb/delete',
-  videoExts: new Set(['mp4', 'mkv', 'avi', 'wmv', 'mov', 'm4v', 'ts', 'flv', 'rmvb', 'webm']),
-  pendingAll: new Map(),
-  searchBlockedUntil: 0,
-  listCachePrefix: 'pan115_list_cache_v1_',
-  mgstagePrefixMap: {
-   LUXU: '259LUXU',
-   MIUM: '300MIUM',
-   GANA: '200GANA',
-   SIRO: 'SIRO',
-   DCV: '277DCV',
-   JNT: '390JNT',
-   JAC: '390JAC',
-   HHH: '451HHH',
-   HLM: '436HLM',
-   SYS: '332SYS',
-   NAMA: '332NAMA',
-   HEN: '353HEN',
-   ARA: '261ARA',
-   FCT: '326FCT',
-   ERK: '420ERK',
-   STH: '420STH',
-   MLA: '476MLA',
-   MMC: '812MMC',
-   MY: '292MY',
-   OERO: '892OERO', },
-  sourceAliases: {
-   PACO: ['PACO', 'PACOPACOMAMA'],
-   PACOPACOMAMA: ['PACO', 'PACOPACOMAMA'],
-   '10MU': ['10MU', '10MUSUME'],
-   '10MUSUME': ['10MU', '10MUSUME'],
-   '1PON': ['1PON', '1PONDO'],
-   '1PONDO': ['1PON', '1PONDO'],
-   CARIB: ['CARIB', 'CARIBBEANCOM'],
-   CARIBBEANCOM: ['CARIB', 'CARIBBEANCOM'],
-   HEYZO: ['HEYZO'], },
-  enabled() { return readStoredValue('btn_show_pan115', false); },
-  normalizeSearchTerm(code) { return String(code || '').trim().toUpperCase().replace(/[_\s]+/g, '-'); },
-  normalizeKeepSeparator(code) { return String(code || '').trim().toUpperCase().replace(/\s+/g, '-'); },
-  playUrl(pickcode) {
-   const encoded = encodeURIComponent(pickcode); const playerMode = readStoredValue('pan115_player_mode', 'official');
-   if (playerMode === '115master') {
-    return`https://115.com/web/lixian/master/video/?pick_code=${encoded}`;
-   }
-   return`https://115vod.com/?pickcode=${encoded}&share_id=0`;
-  },
-  isPotPlayerMode() { return readStoredValue('pan115_player_mode', 'official') === 'potplayer'; },
-  potPlayerCommand(url, title = '') {
-   const direct = String(url || '').trim();
-   const cleanTitle = String(title || '').replace(/[\r\n]/g, ' ').split('"').join(' ').trim();
-   return [
-    `potplayer://${direct}`,
-    '/current',
-    `/user_agent="${String(navigator.userAgent).replace(/[\r\n]/g, ' ').split('"').join(' ')}"`,
-    '/referer="https://115.com/"',
-    cleanTitle ? `/title="${cleanTitle}"` : '',
-   ].filter(Boolean).join(' ');
-  },
-  async playPotPlayer(pickcode, title = '') {
-   const directUrl = await fetchPan115DirectUrl(pickcode);
-   GM_setClipboard(this.potPlayerCommand(directUrl, title));
-   window.open('potplayer:///current/clipboard', '_self');
-   return directUrl; },
-  listCacheKey(code) {
-   return`${this.listCachePrefix}${this.normalizeKeepSeparator(code)}`;
-  },
-  isSearchBlocked() { return Date.now() < this.searchBlockedUntil; },
-  blockSearch(duration = 10 * 60 * 1000) {
-   this.searchBlockedUntil = Date.now() + duration; },
-  clearSearchBlock() {
-   this.searchBlockedUntil = 0; },
-  getListCached(code) {
-   try {
-    const raw = readSessionValue(this.listCacheKey(code));
-    if (!raw) return undefined;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || !parsed.length) { deleteSessionValue(this.listCacheKey(code)); return undefined; }
-    return parsed;
-   } catch { return undefined; } },
-  setListCached(code, value) {
-   const matches = Array.isArray(value) ? value : [];
-   if (!matches.length) { deleteSessionValue(this.listCacheKey(code)); return; }
-   writeSessionValue(this.listCacheKey(code), JSON.stringify(matches)); },
-  clearCached(code) {
-   const normalized = this.normalizeKeepSeparator(code); deleteSessionValue(this.listCacheKey(normalized)); },
-  sourceGroup(source) { return this.sourceAliases[String(source || '').toUpperCase()] || [String(source || '').toUpperCase()].filter(Boolean); },
-  uncensoredParts(code) {
-   const normalized = this.normalizeKeepSeparator(code);
-   const match = normalized.match(/^(\d{6})([-_])(\d{2,3})(?:[-_]([A-Z0-9]+))?$/);
-   return match ? { date: match[1], sep: match[2], num: match[3], source: match[4] || '' } : null; },
-  uncensoredDigitKey(code) {
-   const parts = this.uncensoredParts(code);
-   return parts ?`${parts.date}${parts.sep}${parts.num}` : '';
-  },
-  fc2Number(code) { return Utils.getFc2Number(code); },
-  extractCode(text, fallbackCode = '') {
-   const specialCode = Utils.extractCode(text, {
-    uncensoredSourcePosition: 'suffix',
-    uncensoredSources: Object.keys(this.sourceAliases),
-    specialOnly: true,
-   });
-   return specialCode || fallbackCode || Utils.extractCode(text); },
-  searchKeyword(code) {
-   const fc2 = this.fc2Number(code);
-   if (fc2) return fc2;
-   return String(code || '').trim().toLowerCase().replace(/^fc2-(?:ppv-)?/, ''); },
-  searchVariants(code) {
-   const normalized = this.normalizeKeepSeparator(code); const variants = [normalized]; const compact = normalized.replace(/[-_]/g, '');
-   if (compact !== normalized) variants.push(compact);
-   const fc2 = this.fc2Number(normalized);
-   if (fc2) {
-    variants.push(`FC2-${fc2}`,`FC2-PPV-${fc2}`, fc2);
-   }
-   const mgstage = normalized.match(/^(\d{3})([A-Z]{2,10})-(\d{2,6})$/);
-   if (mgstage && Object.values(this.mgstagePrefixMap).includes(`${mgstage[1]}${mgstage[2]}`)) {
-    variants.push(`${mgstage[2]}-${mgstage[3]}`);
-   }
-   const shortMgstage = normalized.match(/^([A-Z]{2,10})-(\d{2,6})$/);
-   if (shortMgstage && this.mgstagePrefixMap[shortMgstage[1]]) {
-    variants.push(`${this.mgstagePrefixMap[shortMgstage[1]]}-${shortMgstage[2]}`);
-   }
-   const uncensored = this.uncensoredParts(normalized);
-   if (uncensored) {
-    variants.push(`${uncensored.date}${uncensored.sep}${uncensored.num}`);
-    if (uncensored.source) {
-     this.sourceGroup(uncensored.source).forEach(source => {
-      variants.push(`${uncensored.date}${uncensored.sep}${uncensored.num}-${source}`);
-      variants.push(`${source}-${uncensored.date}${uncensored.sep}${uncensored.num}`);
-     }); } }
-   return [...new Set(variants.filter(Boolean))]; },
-  codeRegex(code) {
-   const fc2 = this.fc2Number(code);
-   if (fc2) {
-    return new RegExp(`(^|[^A-Z0-9])(?:FC2[-_\\s]?(?:PPV[-_\\s]?)?${fc2}|${fc2})([^A-Z0-9]|$)`, 'i');
-   }
-   const digitKey = this.uncensoredDigitKey(code);
-   if (digitKey) {
-    const parts = this.uncensoredParts(code); const sep = parts.sep === '_' ? '_' : '-';
-    return new RegExp(`(^|[^0-9])${parts.date}${sep}${parts.num}([^0-9]|$)`, 'i');
-   }
-   const patterns = [];
-   const add = value => {
-    const normalized = this.normalizeSearchTerm(value);
-    if (!normalized) return;
-    const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[-_]/g, '[-_\\s]?');
-    patterns.push(escaped, normalized.replace(/[-_]/g, '')); };
-   this.searchVariants(code).forEach(add);
-   return new RegExp(`(?:${[...new Set(patterns)].join('|')})`, 'i');
-  },
-  isVideoName(name) {
-   const ext = String(name || '').split('.').pop().toLowerCase(); return this.videoExts.has(ext); },
-  parseSize(value) {
-   if (value == null || value === '') return 0;
-   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-   const text = String(value).trim().replace(/,/g, ''); const unitMatch = text.match(/^([\d.]+)\s*(b|kb|mb|gb|tb)$/i);
-   if (unitMatch) {
-    const amount = Number(unitMatch[1]); const unit = unitMatch[2].toLowerCase();
-    const power = { b: 0, kb: 1, mb: 2, gb: 3, tb: 4 }[unit] || 0;
-    return Number.isFinite(amount) ? Math.round(amount * 1024 ** power) : 0; }
-   const numeric = Number(text); return Number.isFinite(numeric) ? numeric : 0; },
-  formatSize(bytes) {
-   const size = this.parseSize(bytes);
-   if (!size) return '';
-   const units = ['B', 'KB', 'MB', 'GB', 'TB']; let value = size; let index = 0;
-   while (value >= 1024 && index < units.length - 1) { value /= 1024; index += 1; }
-   const digits = index >= 3 ? 2 : index >= 2 ? 1 : 0;
-   return`${value.toFixed(digits).replace(/\.0+$/, '')} ${units[index]}`;
-  },
-  lowPriorityReason(item) {
-   const name = String(item?.name || ''); const size = this.parseSize(item?.size); const previewName = /(?:^|[.\-_\s])(?:tp|trailer|sample|preview|pv|cm|予告|预告|試看|试看)(?:[.\-_\s]|$)/i.test(name);
-   if (previewName) return 'Nghi vấn trailer/mẫu';
-   if (size > 0 && size < 180 * 1024 * 1024) return 'Tập tin dung lượng nhỏ';
-   return ''; },
-  candidateRank(item) { const reason = this.lowPriorityReason(item); const size = this.parseSize(item?.size); return (reason ? 1000 : 0) - Math.min(size / (1024 ** 3), 100); },
-  flattenFiles(payload) {
-   const candidates = [ payload?.data, payload?.data?.list, payload?.data?.files, payload?.data?.items, payload?.files, payload?.list ]; const arr = candidates.find(Array.isArray) || [];
-   return arr.map(item => ({
-    name: item.n || item.name || item.file_name || item.filename || item.title || '',
-    pickcode: item.pc || item.pickcode || item.pick_code || item.pickCode || item.pick || '',
-    fileId: item.fid || item.file_id || item.fileId || item.id || '',
-    size: this.parseSize(item.s || item.size || item.file_size || item.fileSize || item.fs || item.bytes),
-    raw: item,
-   })).filter(item => item.name); },
-  async requestSearch(keyword) {
-   const query = new URLSearchParams({
-    search_value: keyword,
-    limit: '50',
-    offset: '0',
-    type: '4',
-   });
-   const response = await gmFetch(`${this.api}?${query}`, {
-    method: 'GET',
-    timeout: 15000,
-    anonymous: false,
-    headers: { Accept: 'application/json, text/plain, */*' },
-   });
-   try {
-    return JSON.parse(response.responseText);
-   } catch (err) {
-    if (response.error?.kind === 'timeout') throw new Error('Yêu cầu 115 quá thời gian (timeout)');
-    if (response.error?.kind === 'network') throw new Error('Yêu cầu 115 thất bại');
-    const error = new Error('115 trả về không phải JSON, có thể chưa đăng nhập'); error.code = 'PAN115_AUTH_REQUIRED'; throw error; } },
-  async searchAll(code) {
-   const matcher = this.codeRegex(code); const seen = new Set(); const matches = []; const keywords = [...new Set(this.searchVariants(code).map(item => this.searchKeyword(item)).filter(Boolean))];
-   for (const keyword of keywords) {
-    const payload = await this.requestSearch(keyword); const state = payload?.state ?? payload?.success;
-    if (state === false) {
-     const msg = payload?.error || payload?.message || payload?.errno || '115 truy vấn thất bại'; const error = new Error(String(msg)); error.code = 'PAN115_SEARCH_UNAVAILABLE'; throw error; }
-    for (const item of this.flattenFiles(payload)) {
-     const key = item.pickcode || item.name;
-     if (seen.has(key)) continue;
-     seen.add(key);
-     if (matcher.test(item.name) && this.isVideoName(item.name) && item.pickcode) { item.lowPriorityReason = this.lowPriorityReason(item); item.sizeText = this.formatSize(item.size); matches.push(item); }
-    }
-    if (matches.some(item => !item.lowPriorityReason)) break;
-   }
-   return matches.sort((a, b) => this.candidateRank(a) - this.candidateRank(b)); },
-  async searchAllCached(code) {
-   const normalized = this.normalizeKeepSeparator(code);
-   if (!normalized) return [];
-   if (this.isSearchBlocked()) throw new Error('Khớp nối 115 đã tạm dừng, vui lòng đăng nhập 115 rồi làm mới trang hoặc mở lại tính năng khớp nối');
-   const cached = this.getListCached(normalized);
-   if (cached !== undefined) return cached;
-   if (this.pendingAll.has(normalized)) return this.pendingAll.get(normalized);
-   const task = this.searchAll(normalized) .then(matches => {
-     this.setListCached(normalized, matches); return matches;
-    }) .catch(error => {
-     this.blockSearch(); throw error;
-    }) .finally(() => this.pendingAll.delete(normalized));
-   this.pendingAll.set(normalized, task); return task; },
-  async deleteFile(fileId) {
-   const fid = String(fileId || '').trim();
-   if (!fid) throw new Error('Thiếu ID tệp 115, không thể xóa');
-   const body = new URLSearchParams(); body.set('fid[0]', fid); body.set('ignore_warn', '1'); return this.postForm(this.deleteApi, body, '115 xóa'); },
-  async renameFile(fileId, newName) {
-   const fid = String(fileId || '').trim(); const fileName = String(newName || '').trim().replace(/[\\/:*?"<>|]/g, ' ');
-   if (!fid) throw new Error('Thiếu ID tệp 115, không thể đổi tên');
-   if (!fileName) throw new Error('Tên tệp mới trống');
-   return this.postForm(this.editApi, new URLSearchParams({ fid, file_name: fileName }), '115 đổi tên'); },
-  async postForm(url, body, label) {
-   const response = await gmFetch(url, {
-    method: 'POST',
-    data: body.toString(),
-    timeout: 15000,
-    anonymous: false,
-    headers: {
-     Accept: 'application/json, text/plain, */*',
-     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', },
-   });
-   if (response.error?.kind === 'timeout') throw new Error(`Yêu cầu ${label} quá thời gian (timeout)`);
-   if (response.error?.kind === 'network') throw new Error(`Yêu cầu ${label} thất bại`);
-   let payload;
-   try {
-    payload = JSON.parse(response.responseText || '{}');
-   } catch (err) {
-    throw new Error(`${label} trả về không phải JSON`);
-   }
-   const ok = payload?.state === true || payload?.success === true || payload?.errno === 0;
-   if (ok) return payload;
-   throw new Error(String(payload?.error || payload?.message || payload?.errno || `${label} thất bại`));
-  }, };
- const M115_RSA_N = BigInt('0x8686980c0f5a24c4b9d43020cd2c22703ff3f450756529058b1cf88f09b8602136477198a6e2683149659bd122c33592fdb5ad47944ad1ea4d36c6b172aad6338c3bb6ac6227502d010993ac967d1aef00f0c8e038de2e4d3bc2ec368af2e9f10a6f1eda4f7262f136420c07c331b871bf139f74f3010e3c4fe57df3afb71683');
- const M115_RSA_E = 0x10001n;
- const M115_G_KTS = [240,229,105,174,191,220,191,138,26,69,232,190,125,166,115,184,222,143,231,196,69,218,134,196,155,100,139,20,106,180,241,170,56,1,53,158,38,105,44,134,0,107,79,165,54,52,98,166,42,150,104,24,242,74,253,189,107,151,143,77,143,137,19,183,108,142,147,237,14,13,72,62,215,47,136,216,254,254,126,134,80,149,79,209,235,131,38,52,219,102,123,156,126,157,122,129,50,234,182,51,222,58,169,89,52,102,59,170,186,129,96,72,185,213,129,156,248,108,132,119,255,84,120,38,95,190,232,30,54,159,52,128,92,69,44,155,118,213,27,143,204,195,184,245];
- const M115_KEY_S = [0x29, 0x23, 0x21, 0x5E]; const M115_KEY_L = [120, 6, 173, 76, 51, 134, 93, 24, 76, 1, 63, 70];
- function m115ModPow(base, exponent, modulus) {
-  let result = 1n; let value = base % modulus; let power = exponent;
-  while (power > 0n) {
-   if (power & 1n) result = (result * value) % modulus;
-   value = (value * value) % modulus; power >>= 1n; }
-  return result; }
- function m115BytesToHex(bytes) { return bytes.map(byte => Number(byte).toString(16).padStart(2, '0')).join(''); }
- function m115HexToBytes(hex) {
-  const bytes = [];
-  for (let i = 0; i < hex.length; i += 2) bytes.push(parseInt(hex.slice(i, i + 2), 16));
-  return bytes; }
- function m115BigIntToBytes(value) {
-  let hex = value.toString(16);
-  if (hex.length % 2) hex = `0${hex}`;
-  return m115HexToBytes(hex); }
- function m115RsaEncrypt(text) {
-  const padded = new Array(128).fill(0); let sourceIndex = text.length - 1; let targetIndex = padded.length;
-  while (sourceIndex >= 0) padded[--targetIndex] = text.charCodeAt(sourceIndex--);
-  padded[--targetIndex] = 0;
-  while (targetIndex > 2) padded[--targetIndex] = 0xff;
-  padded[--targetIndex] = 2; const encrypted = m115ModPow(BigInt('0x' + m115BytesToHex(padded)), M115_RSA_E, M115_RSA_N); return encrypted.toString(16).padStart(256, '0'); }
- function m115RsaDecrypt(text) {
-  const encrypted = BigInt('0x' + m115BytesToHex([...text].map(char => char.charCodeAt(0)))); const padded = m115BigIntToBytes(m115ModPow(encrypted, M115_RSA_E, M115_RSA_N)); let separator = 1;
-  while (separator < padded.length && padded[separator] !== 0) separator += 1;
-  return String.fromCharCode(...padded.slice(separator + 1)); }
- function m115GetKey(length, key) {
-  if (key) return Array.from({ length }, (_, index) => ((key[index] + M115_G_KTS[length * index]) & 0xff) ^ M115_G_KTS[length * (length - 1 - index)]);
-  return (length === 12 ? M115_KEY_L : M115_KEY_S).slice(); }
- function m115XorEncode(source, key) {
-  const remainder = source.length % 4; const result = [];
-  for (let index = 0; index < remainder; index += 1) result.push(source[index] ^ key[index % key.length]);
-  for (let index = remainder; index < source.length; index += 1) result.push(source[index] ^ key[(index - remainder) % key.length]);
-  return result; }
- function m115SymEncode(source, key1, key2) { const result = m115XorEncode(source, m115GetKey(4, key1)); result.reverse(); return m115XorEncode(result, m115GetKey(12, key2)); }
- function m115SymDecode(source, key1, key2) { const result = m115XorEncode(source, m115GetKey(12, key2)); result.reverse(); return m115XorEncode(result, m115GetKey(4, key1)); }
- function m115StringToBytes(value) { return [...value].map(char => char.charCodeAt(0)); }
- function m115BytesToString(bytes) { return bytes.map(byte => String.fromCharCode(byte)).join(''); }
- function m115AsymEncode(source) {
-  const chunkSize = 128 - 11; let encoded = '';
-  for (let index = 0; index < Math.ceil(source.length / chunkSize); index += 1) { const chunk = source.slice(index * chunkSize, Math.min((index + 1) * chunkSize, source.length)); encoded += m115RsaEncrypt(m115BytesToString(chunk)); }
-  return btoa(m115HexToBytes(encoded).map(byte => String.fromCharCode(byte)).join('')); }
- function m115AsymDecode(source) {
-  const chunkSize = 128; let decoded = '';
-  for (let index = 0; index < Math.ceil(source.length / chunkSize); index += 1) { const chunk = source.slice(index * chunkSize, Math.min((index + 1) * chunkSize, source.length)); decoded += m115RsaDecrypt(m115BytesToString(chunk)); }
-  return m115StringToBytes(decoded); }
- function m115Md5(value) {
-  if (typeof MagnetApi !== 'undefined' && typeof MagnetApi.javdbMd5 === 'function') return MagnetApi.javdbMd5(value);
-  throw new Error('Mô-đun MD5 chưa tải'); }
- function m115Encode(source, timestamp) {
-  const key = m115StringToBytes(m115Md5(`!@###@#${timestamp}DFDR@#@#`));
-  let encoded = m115StringToBytes(source); encoded = m115SymEncode(encoded, key, null); encoded = key.slice(0, 16).concat(encoded);
-  return { data: m115AsymEncode(encoded), key }; }
- function m115Decode(source, key) { let decoded = m115StringToBytes(atob(source)); decoded = m115AsymDecode(decoded); return m115BytesToString(m115SymDecode(decoded.slice(16), key, decoded.slice(0, 16))); }
- async function fetchPan115DirectUrl(pickcode) {
-  const timestamp = Math.floor(Date.now() / 1000);
-  const { data, key } = m115Encode(JSON.stringify({ pickcode }), timestamp);
-  const response = await gmFetch(`${Pan115.directApi}?t=${timestamp}`, {
-   method: 'POST',
-   data: `data=${encodeURIComponent(data)}`,
-   timeout: 20000,
-   anonymous: false,
-   headers: {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    Referer: 'https://115.com/',
-    'User-Agent': navigator.userAgent, },
-  });
-  if (response.error?.kind === 'timeout') throw new Error('Yêu cầu link trực tiếp 115 quá thời gian (timeout)');
-  if (response.error?.kind === 'network') throw new Error('Yêu cầu link trực tiếp 115 thất bại');
-  let payload;
-  try {
-   payload = JSON.parse(response.responseText || '{}');
-  } catch (error) {
-   throw new Error(`Phân tích link trực tiếp 115 thất bại: ${error.message}`);
-  }
-  if (!payload.state) throw new Error(payload.msg || payload.error || `errno:${payload.errno || response.status || 0}`);
-  let decoded;
-  try {
-   decoded = JSON.parse(m115Decode(payload.data, key));
-  } catch (error) {
-   throw new Error(`Phân tích link trực tiếp 115 thất bại: ${error.message}`);
-  }
-  const fileId = Object.keys(decoded)[0]; const directUrl = decoded[fileId]?.url?.url;
-  if (!directUrl) throw new Error('115 không trả về link trực tiếp phát được');
-  return directUrl; }
+  enabled() { return false; },
+  sourceAliases: {},
+  mgstagePrefixMap: {},
+  extractCode(text, fallback = '') { return fallback || (typeof Utils !== 'undefined' && Utils.extractCode ? Utils.extractCode(text) : ''); },
+  normalizeKeepSeparator(code) { return typeof Utils !== 'undefined' && Utils.normalizeCode ? Utils.normalizeCode(code) : String(code || ''); },
+  isPotPlayerMode() { return false; },
+  isSearchBlocked() { return false; },
+  clearSearchBlock() {},
+  clearCached() {},
+  getListCached() { return undefined; },
+  setListCached() {},
+  searchAll() { return Promise.resolve([]); },
+  searchAllCached() { return Promise.resolve([]); },
+  playUrl() { return '#'; },
+  playPotPlayer() { return Promise.resolve(''); },
+  deleteFile() { return Promise.resolve(false); },
+  renameFile() { return Promise.resolve(false); },
+  batchRename() { return Promise.resolve([]); },
+  formatSize() { return ''; },
+  parseSize() { return 0; },
+  uncensoredParts() { return null; },
+  uncensoredDigitKey() { return ''; },
+  fc2Number(code) { return typeof Utils !== 'undefined' && Utils.getFc2Number ? Utils.getFc2Number(code) : ''; },
+  searchKeyword(code) { return String(code || '').trim(); },
+  searchVariants(code) { return [this.normalizeKeepSeparator(code)]; },
+  isVideoName() { return false; },
+ };
  function injectSettingsPanelStyles() {
   injectStyle('ui-settings-panel-style',`#jav-settings-overlay{position:fixed;inset:0;z-index:10000020;background:rgba(15,23,42,.62);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(7px);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#jav-settings-panel{width:min(800px,94vw);max-height:88vh;background:linear-gradient(180deg,#f8fbff 0%,#f6f3ff 46%,#fff7ed 100%);color:#111827;border:1px solid rgba(148,163,184,.38);border-radius:16px;box-shadow:0 26px 76px rgba(15,23,42,.36);display:flex;flex-direction:column;overflow:hidden}#jav-settings-panel *{box-sizing:border-box}#jav-settings-panel .sp-header{padding:18px 22px;background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 54%,#7c2d12 100%);border-bottom:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:space-between;flex:0 0 auto}#jav-settings-panel .sp-title{font-size:18px;font-weight:750;color:#fff}#jav-settings-panel .sp-close{width:32px;height:32px;border:1px solid rgba(255,255,255,.24);border-radius:8px;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-size:18px;line-height:1}#jav-settings-panel .sp-close:hover{background:rgba(255,255,255,.18)}#jav-settings-panel .sp-body{padding:18px 22px;overflow:auto;display:grid;gap:14px;flex:1 1 auto;min-height:0;overscroll-behavior:contain;scrollbar-gutter:stable}#jav-settings-panel .sp-card{position:relative;background:rgba(255,255,255,.92);border:1px solid rgba(203,213,225,.88);border-radius:10px;padding:15px;box-shadow:0 10px 24px rgba(15,23,42,.06);overflow:hidden}#jav-settings-panel .sp-card::before{content:'';position:absolute;left:0;top:0;width:4px;height:100%;background:#2563eb}#jav-settings-panel .sp-card-magnet::before{background:#16a34a}#jav-settings-panel .sp-card-features::before{background:#00a85a}#jav-settings-panel .sp-card-order::before{background:#dc2626}#jav-settings-panel .sp-card-title{font-size:13px;font-weight:750;color:#1e293b;margin-bottom:12px}#jav-settings-panel .sp-card-jump::before{background:#6366f1}#jav-settings-panel .sp-card-jump .sp-grid{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e2e8f0}#jav-settings-panel .sp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}#jav-settings-panel .sp-feature-order-row{display:grid;grid-template-columns:2fr 1fr;gap:14px;align-items:stretch}#jav-settings-panel .sp-feature-order-row>.sp-card{height:100%}#jav-settings-panel .sp-feature-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#jav-settings-panel .sp-feature-item{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;padding:10px 11px;border:1px solid #e2e8f0;border-radius:8px;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%)}#jav-settings-panel .sp-feature-item .sp-desc{margin-top:2px;font-size:11px}#jav-settings-panel .sp-feature-select{order:1;grid-column:2;display:grid;grid-template-columns:1fr 64px;align-items:center;gap:10px;min-width:0;padding:10px 11px;border:1px solid #e2e8f0;border-radius:8px;background:linear-gradient(180deg,#fff 0%,#f8fafc 100%)}#jav-settings-panel .sp-feature-select .sp-select{height:28px;padding:3px 2px 3px 4px;font-size:12px;text-align:left}#jav-settings-panel .sp-feature-magnet-display{order:1;grid-column:1;grid-template-columns:minmax(0,1fr) 100px}#jav-settings-panel .sp-feature-select:has(#sp-pan115-player){grid-template-columns:minmax(0,1fr) 100px}#jav-settings-panel .sp-feature-restore-toggle{order:4;grid-column:1 / -1;cursor:pointer}#jav-settings-panel .sp-feature-checkbox{width:18px;height:18px;flex:0 0 auto;accent-color:#4f46e5;cursor:pointer}#jav-settings-panel .sp-cache-clean{background:linear-gradient(135deg,#fff 0%,#f8fbff 58%,#f0f9ff 100%)}#jav-settings-panel .sp-cache-clear-btn{position:relative;width:34px;height:34px;flex:0 0 auto;display:grid;place-items:center;border:1px solid #bae6fd;border-radius:10px;background:linear-gradient(180deg,#f0f9ff,#fff);color:#0284c7;cursor:pointer;overflow:hidden;transition:transform .16s,border-color .16s,background .16s,color .16s,box-shadow .16s}#jav-settings-panel .sp-cache-clear-btn::after{content:'';position:absolute;inset:-8px;border-radius:inherit;background:radial-gradient(circle,rgba(14,165,233,.22),transparent 62%);opacity:0;transform:scale(.45);transition:opacity .22s,transform .22s}#jav-settings-panel .sp-cache-clear-btn:hover{transform:translateY(-1px);border-color:#38bdf8;color:#0369a1;box-shadow:0 8px 18px rgba(14,165,233,.18)}#jav-settings-panel .sp-cache-clear-btn:active{transform:translateY(0) scale(.96)}#jav-settings-panel .sp-cache-clear-btn.is-clearing::after{opacity:1;transform:scale(1)}#jav-settings-panel .sp-cache-clear-btn.is-done{border-color:#86efac;background:linear-gradient(180deg,#ecfdf5,#fff);color:#15803d}#jav-settings-panel .sp-cache-clear-icon{position:relative;z-index:1;display:inline-block;font-size:15px;line-height:1}#jav-settings-panel .sp-cache-clear-btn.is-clearing .sp-cache-clear-icon{animation:spCacheSpin .48s ease}@keyframes spCacheSpin{to{transform:rotate(360deg)}}#jav-settings-panel .sp-field{display:flex;flex-direction:column;gap:6px;min-width:0}#jav-settings-panel .sp-label{font-size:12px;font-weight:650;color:#475569}#jav-settings-panel .sp-input,#jav-settings-panel .sp-select{width:100%;min-width:0;height:34px;padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font-size:13px;outline:none}#jav-settings-panel .sp-input:focus,#jav-settings-panel .sp-select:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}#jav-settings-panel .sp-engine-row{display:grid;grid-template-columns:170px 1fr;gap:10px;align-items:end}#jav-settings-panel .sp-cache-actions{display:flex;align-items:center;gap:8px;margin-right:auto}#jav-settings-panel .sp-cache-feedback{min-width:64px;color:#059669;font-size:12px;font-weight:650}#jav-settings-panel .sp-footer-links{display:flex;align-items:center;gap:8px;margin-right:4px}#jav-settings-panel .sp-footer-link{color:#475569;font-size:12px;font-weight:700;text-decoration:none;padding:6px 8px;border-radius:7px}#jav-settings-panel .sp-footer-link:hover{color:#1d4ed8;background:#eff6ff}#jav-settings-panel .sp-footer-sep{width:1px;height:16px;background:#cbd5e1}#jav-settings-panel .sp-desc{font-size:12px;color:#64748b;line-height:1.45}#jav-settings-panel .sp-toggle{position:relative;display:inline-block;width:44px;height:26px;flex:0 0 auto}#jav-settings-panel .sp-toggle input{opacity:0;width:0;height:0}#jav-settings-panel .sp-toggle-track{position:absolute;inset:0;border-radius:999px;background:#aeb4bc;border:1px solid rgba(71,85,105,.28);box-shadow:inset 0 2px 4px rgba(15,23,42,.18),inset 0 -1px 1px rgba(255,255,255,.38);cursor:pointer;transition:background .18s,border-color .18s,box-shadow .18s}#jav-settings-panel .sp-toggle-track::before{content:'';position:absolute;width:20px;height:20px;left:2px;top:2px;border-radius:50%;background:linear-gradient(145deg,#fff 0%,#f1f3f5 100%);border:1px solid rgba(148,163,184,.42);box-shadow:0 2px 5px rgba(15,23,42,.28),0 1px 1px rgba(255,255,255,.86) inset;transition:transform .2s cubic-bezier(.2,.8,.2,1)}#jav-settings-panel .sp-toggle input:checked+.sp-toggle-track{background:#35b96f;border-color:#238653;box-shadow:inset 0 2px 4px rgba(20,91,55,.24),inset 0 -1px 1px rgba(255,255,255,.34)}#jav-settings-panel .sp-toggle input:checked+.sp-toggle-track::before{transform:translateX(18px)}#jav-settings-panel .sp-toggle input:focus-visible+.sp-toggle-track{outline:3px solid rgba(37,99,235,.28);outline-offset:2px}#jav-settings-panel .sp-order-list{display:flex;flex-direction:column;gap:8px}#jav-settings-panel .sp-order-item{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:10px 11px;border:1px solid #e2e8f0;border-radius:8px;background:linear-gradient(90deg,#fff 0%,#f8fafc 100%);user-select:none}#jav-settings-panel .sp-order-name{font-size:13px;font-weight:700;color:#1e293b}#jav-settings-panel .sp-dot{width:9px;height:9px;border-radius:50%}#jav-settings-panel .sp-order-actions{display:flex;gap:5px}#jav-settings-panel .sp-order-btn{width:28px;height:28px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#334155;cursor:pointer;font-size:14px;line-height:1}#jav-settings-panel .sp-order-btn:hover:not(:disabled){border-color:#2563eb;color:#1d4ed8;background:#eff6ff}#jav-settings-panel .sp-order-btn:disabled{opacity:.36;cursor:not-allowed}#jav-settings-panel .sp-footer{padding:14px 22px;background:rgba(255,255,255,.92);border-top:1px solid rgba(203,213,225,.86);display:flex;align-items:center;justify-content:flex-end;gap:10px;flex:0 0 auto}#jav-settings-panel .sp-btn{height:34px;padding:0 16px;border-radius:8px;border:1px solid transparent;font-size:13px;font-weight:700;cursor:pointer}#jav-settings-panel .sp-btn-cancel{background:#fff;color:#475569;border-color:#cbd5e1}#jav-settings-panel .sp-btn-clear{background:#fff7ed;color:#9a3412;border-color:#fed7aa}#jav-settings-panel .sp-btn-clear:hover{background:#ffedd5}#jav-settings-panel .sp-btn-save{background:linear-gradient(135deg,#2563eb,#7c3aed);color:white;box-shadow:0 8px 20px rgba(79,70,229,.25)}@media (max-width:640px){#jav-settings-panel .sp-grid,#jav-settings-panel .sp-engine-row,#jav-settings-panel .sp-feature-grid,#jav-settings-panel .sp-feature-order-row{grid-template-columns:1fr}#jav-settings-panel .sp-feature-item{grid-column:auto!important}#jav-settings-panel .sp-cache-actions{margin-right:0}#jav-settings-panel .sp-footer{flex-wrap:wrap}}#jav-settings-panel .sp-chip-group{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}#jav-settings-panel .sp-chip input{display:none}#jav-settings-panel .sp-chip-label{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:999px;border:.5px solid var(--color-border-secondary,#cbd5e1);background:var(--color-background-secondary,#f8fafc);color:var(--color-text-secondary,#64748b);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;user-select:none}#jav-settings-panel .sp-chip input:checked+.sp-chip-label{border-color:#6366f1;background:#eef2ff;color:#4338ca}#jav-settings-panel .sp-chip-label:hover{border-color:#a5b4fc;background:#f0f4ff;color:#4338ca}#jav-settings-panel .sp-chip-dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.6;flex:0 0 auto}@media (max-width:720px){#jav-settings-overlay{align-items:flex-start;padding:6px}#jav-settings-panel{width:100%;max-height:calc(100dvh - 12px);border-radius:12px}#jav-settings-panel .sp-header{padding:14px 16px}#jav-settings-panel .sp-body{padding:12px;gap:10px}#jav-settings-panel .sp-card{padding:12px}#jav-settings-panel .sp-footer{padding:10px 12px;gap:8px}#jav-settings-panel .sp-btn{min-height:40px}#jav-settings-panel .sp-input,#jav-settings-panel .sp-select{min-height:40px;height:40px}#jav-settings-panel .sp-chip-label{min-height:36px;padding:7px 10px}}html[data-laosiji-mobile] #jav-settings-overlay{align-items:center;padding:6px}html[data-laosiji-mobile] #jav-settings-panel{width:min(800px,calc(100vw - 12px));height:calc(100dvh - 12px);max-height:calc(100dvh - 12px);min-height:0;box-sizing:border-box}html[data-laosiji-mobile] #jav-settings-panel .sp-body{display:flex;flex-direction:column;align-items:stretch;scroll-padding-block:12px;-webkit-overflow-scrolling:touch}html[data-laosiji-mobile] #jav-settings-panel .sp-grid,html[data-laosiji-mobile] #jav-settings-panel .sp-engine-row,html[data-laosiji-mobile] #jav-settings-panel .sp-feature-grid,html[data-laosiji-mobile] #jav-settings-panel .sp-feature-order-row{grid-template-columns:minmax(0,1fr)}html[data-laosiji-mobile] #jav-settings-panel .sp-feature-item,html[data-laosiji-mobile] #jav-settings-panel .sp-feature-select,html[data-laosiji-mobile] #jav-settings-panel .sp-feature-magnet-display,html[data-laosiji-mobile] #jav-settings-panel .sp-feature-restore-toggle{grid-column:auto!important}html[data-laosiji-mobile] #jav-settings-panel .sp-feature-select,html[data-laosiji-mobile] #jav-settings-panel .sp-feature-magnet-display,html[data-laosiji-mobile] #jav-settings-panel .sp-feature-select:has(#sp-pan115-player){grid-template-columns:minmax(0,1fr) 108px}html[data-laosiji-mobile] #jav-settings-panel .sp-card,html[data-laosiji-mobile] #jav-settings-panel .sp-feature-order-row{flex:0 0 auto}html[data-laosiji-mobile] #jav-settings-panel .sp-footer{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}html[data-laosiji-mobile] #jav-settings-panel .sp-cache-actions{display:grid;grid-column:1 / -1;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;width:100%;margin:0}html[data-laosiji-mobile] #jav-settings-panel .sp-footer-links{min-width:0;gap:2px;margin:0}html[data-laosiji-mobile] #jav-settings-panel .sp-footer-link{padding:6px 5px;white-space:nowrap}html[data-laosiji-mobile] #jav-settings-panel .sp-cache-feedback{grid-column:1 / -1;min-width:0}html[data-laosiji-mobile] #jav-settings-panel .sp-footer>.sp-btn{width:100%}#jav-settings-panel{width:min(1040px,calc(100vw - 32px));height:min(780px,calc(100dvh - 32px));min-height:0;max-height:none;background:#f8fafc}#jav-settings-panel .sp-body{padding:0;display:block;background:#f8fafc}#jav-settings-panel .sp-layout{display:grid;grid-template-columns:210px minmax(0,1fr);min-height:0;height:100%}#jav-settings-panel .sp-nav{display:flex;flex-direction:column;gap:4px;padding:16px 10px;border-right:1px solid #e2e8f0;background:#f1f5f9}#jav-settings-panel .sp-nav-item{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;padding:11px 12px;border:1px solid transparent;border-radius:7px;background:transparent;color:#475569;text-align:left;cursor:pointer}#jav-settings-panel .sp-nav-item:hover{background:#e2e8f0;color:#1e3a8a}#jav-settings-panel .sp-nav-item.is-active{border-color:#bfdbfe;background:#fff;color:#1d4ed8;box-shadow:0 2px 5px rgba(15,23,42,.06)}#jav-settings-panel .sp-nav-label{font-size:13px;font-weight:800}#jav-settings-panel .sp-nav-item small{color:#64748b;font-size:10px;line-height:1.35}#jav-settings-panel .sp-nav-item.is-active small{color:#64748b}#jav-settings-panel .sp-content{min-width:0;min-height:0;overflow:auto;padding:20px 22px;overscroll-behavior:contain;scrollbar-gutter:stable}#jav-settings-panel .sp-section{display:block}#jav-settings-panel .sp-section[hidden]{display:none!important}#jav-settings-panel .sp-section-head{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #e2e8f0}#jav-settings-panel .sp-section-title{color:#0f172a;font-size:17px;font-weight:850}#jav-settings-panel .sp-section-desc{margin-top:4px;color:#64748b;font-size:12px}#jav-settings-panel .sp-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 12px}#jav-settings-panel .sp-setting-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,.8fr);align-items:center;gap:14px;min-width:0;min-height:58px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:7px;background:#fff}#jav-settings-panel .sp-setting-row:focus-within{border-color:#93c5fd;box-shadow:0 0 0 2px rgba(59,130,246,.1)}#jav-settings-panel .sp-setting-copy{display:flex;flex-direction:column;gap:3px;min-width:0}#jav-settings-panel .sp-setting-copy strong{color:#1e293b;font-size:13px;font-weight:750}#jav-settings-panel .sp-setting-copy small{color:#64748b;font-size:11px;line-height:1.35}#jav-settings-panel .sp-setting-row>.sp-select,#jav-settings-panel .sp-setting-row>.sp-input{height:32px}#jav-settings-panel .sp-setting-row>.sp-select:disabled{opacity:.5;cursor:not-allowed}#jav-settings-panel .sp-range{width:100%;min-width:0;accent-color:#2563eb}#jav-settings-panel output{min-width:42px;color:#1d4ed8;font-size:12px;font-weight:800;text-align:right}#jav-settings-panel .sp-setting-row:has(.sp-range){grid-template-columns:minmax(0,1fr) minmax(90px,1fr) 42px}#jav-settings-panel .sp-toggle{position:relative;display:inline-block;justify-self:end;width:44px;height:26px}#jav-settings-panel .sp-toggle input{position:absolute;inset:0;z-index:2;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}#jav-settings-panel .sp-toggle-track{position:absolute;inset:0;border-radius:999px;background:#aeb4bc;border:1px solid rgba(71,85,105,.28);box-shadow:inset 0 2px 4px rgba(15,23,42,.18),inset 0 -1px 1px rgba(255,255,255,.38);transition:background .18s,border-color .18s,box-shadow .18s}#jav-settings-panel .sp-toggle-track::before{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:linear-gradient(145deg,#fff 0%,#f1f3f5 100%);border:1px solid rgba(148,163,184,.42);box-shadow:0 2px 5px rgba(15,23,42,.28),0 1px 1px rgba(255,255,255,.86) inset;transition:transform .2s cubic-bezier(.2,.8,.2,1)}#jav-settings-panel .sp-toggle input:checked+.sp-toggle-track{background:#35b96f;border-color:#238653;box-shadow:inset 0 2px 4px rgba(20,91,55,.24),inset 0 -1px 1px rgba(255,255,255,.34)}#jav-settings-panel .sp-toggle input:checked+.sp-toggle-track::before{transform:translateX(18px)}#jav-settings-panel .sp-toggle input:focus-visible+.sp-toggle-track{outline:3px solid rgba(37,99,235,.28);outline-offset:2px}#jav-settings-panel .sp-engine-editor{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,1.3fr)}#jav-settings-panel .sp-engine-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:7px;min-width:0}#jav-settings-panel .sp-button-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#jav-settings-panel .sp-subsection-title{grid-column:1 / -1;margin-top:4px;padding:3px 2px 1px;color:#334155;font-size:12px;font-weight:800;letter-spacing:.02em}#jav-settings-panel .sp-full-video-block{grid-column:1 / -1;display:flex;flex-direction:column;gap:4px;padding:10px 12px 12px;border:1px solid #e2e8f0;border-radius:7px;background:#fff}#jav-settings-panel .sp-full-video-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px;min-width:0}#jav-settings-panel .sp-full-video-controls .sp-setting-row{min-height:54px;padding:8px 0;border:0;border-radius:0;background:transparent}#jav-settings-panel .sp-full-video-controls .sp-setting-row:focus-within{border:0;border-radius:4px;box-shadow:inset 0 0 0 1px #93c5fd}#jav-settings-panel .sp-full-video-controls .sp-setting-row+.sp-setting-row{border-left:1px solid #e2e8f0;padding-left:16px}#jav-settings-panel .sp-button-grid .sp-chip{position:relative;margin:0;width:auto;min-height:58px;padding:10px 12px;cursor:pointer}#jav-settings-panel .sp-button-grid .sp-chip input{display:block;position:absolute;inset:0;z-index:2;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}#jav-settings-panel .sp-button-grid .sp-chip input:checked~.sp-toggle .sp-toggle-track{background:#35b96f;border-color:#238653}#jav-settings-panel .sp-button-grid .sp-chip input:checked~.sp-toggle .sp-toggle-track::before{transform:translateX(18px)}#jav-settings-panel .sp-order-block{grid-column:1 / -1;padding:12px;border:1px solid #e2e8f0;border-radius:7px;background:#fff}#jav-settings-panel .sp-cache-panel{grid-column:1 / -1;padding:12px;border:1px solid #dbeafe;border-radius:8px;background:linear-gradient(180deg,#f8fbff 0%,#fff 100%)}#jav-settings-panel .sp-cache-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:10px;border-bottom:1px solid #e2e8f0}#jav-settings-panel .sp-cache-panel-head strong,#jav-settings-panel .sp-cache-copy strong{display:block;color:#1e293b;font-size:13px;font-weight:750}#jav-settings-panel .sp-cache-panel-head small,#jav-settings-panel .sp-cache-copy small{display:block;margin-top:3px;color:#64748b;font-size:11px;line-height:1.4}#jav-settings-panel .sp-cache-all-btn,#jav-settings-panel .sp-cache-clear-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:32px;padding:0 10px;border:1px solid #bae6fd;border-radius:7px;background:#f0f9ff;color:#0369a1;font-size:12px;font-weight:700;cursor:pointer;transition:background .16s,border-color .16s,color .16s,transform .16s}#jav-settings-panel .sp-cache-clear-btn{width:auto;height:32px;flex:0 0 auto;overflow:visible}#jav-settings-panel .sp-cache-clear-btn::after{display:none}#jav-settings-panel .sp-cache-all-btn{border-color:#93c5fd;background:#dbeafe;color:#1d4ed8;white-space:nowrap}#jav-settings-panel .sp-cache-all-btn:hover,#jav-settings-panel .sp-cache-clear-btn:hover{border-color:#38bdf8;background:#e0f2fe;color:#075985;transform:translateY(-1px)}#jav-settings-panel .sp-cache-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}#jav-settings-panel .sp-cache-item{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;padding:9px 10px;border:1px solid #e2e8f0;border-radius:7px;background:#fff}#jav-settings-panel .sp-cache-copy{min-width:0}#jav-settings-panel .sp-cache-clear-btn span:last-child{white-space:nowrap}#jav-settings-panel .sp-cache-feedback{min-height:18px;margin-top:8px;color:#059669;font-size:12px;font-weight:650}#jav-settings-panel .sp-order-block .sp-order-list{margin-top:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}#jav-settings-panel .sp-order-block .sp-order-item{min-width:0;padding:8px 9px;border-radius:6px;background:#f8fafc}@media (max-width:720px){#jav-settings-panel{width:calc(100vw - 12px);height:calc(100dvh - 12px);min-height:0;max-height:none}#jav-settings-panel .sp-layout{display:flex;flex-direction:column}#jav-settings-panel .sp-nav{flex-direction:row;overflow-x:auto;padding:8px;border-right:0;border-bottom:1px solid #e2e8f0}#jav-settings-panel .sp-nav-item{flex:0 0 112px;min-height:52px;padding:8px 9px}#jav-settings-panel .sp-nav-item small{display:none}#jav-settings-panel .sp-content{padding:14px 12px}#jav-settings-panel .sp-settings-grid,#jav-settings-panel .sp-button-grid{grid-template-columns:minmax(0,1fr)}#jav-settings-panel .sp-full-video-controls{grid-template-columns:minmax(0,1fr)}#jav-settings-panel .sp-full-video-controls .sp-setting-row+.sp-setting-row{border-top:1px solid #e2e8f0;border-left:0;padding-left:0}#jav-settings-panel .sp-setting-row,#jav-settings-panel .sp-setting-row:has(.sp-range),#jav-settings-panel .sp-engine-editor{grid-template-columns:minmax(0,1fr) minmax(105px,.8fr)}#jav-settings-panel .sp-setting-row:has(.sp-range){grid-template-columns:minmax(0,1fr) minmax(90px,1fr) 42px}#jav-settings-panel .sp-engine-editor{display:grid}#jav-settings-panel .sp-engine-controls{grid-template-columns:minmax(0,1fr)}#jav-settings-panel .sp-cache-list{grid-template-columns:minmax(0,1fr)}#jav-settings-panel .sp-cache-panel-head{align-items:flex-start;flex-direction:column}#jav-settings-panel .sp-order-block .sp-order-list{grid-template-columns:minmax(0,1fr)}}`);
  }
@@ -4363,8 +3893,7 @@
    { key: 'search', cfgKey: 'btnShowSearch', label: 'Nhóm tìm kiếm' },
    { key: 'subtitle', cfgKey: 'btnShowSubtitle', label: 'Phụ đề' },
    { key: 'trailer', cfgKey: 'btnShowTrailer', label: 'Trailer' },
-   { key: 'preview', cfgKey: 'btnShowPreview', label: 'Ảnh xem trước' },
-   { key: 'pan115', cfgKey: 'btnShowPan115', label: 'Khớp 115' }, ];
+   { key: 'preview', cfgKey: 'btnShowPreview', label: 'Ảnh xem trước' }, ];
   const PANEL_SECTIONS = [ { id: 'common', label: 'Phổ biến' }, { id: 'layout', label: 'Giao diện' }, { id: 'search', label: 'Tìm kiếm & Phát' }, { id: 'sites', label: 'Trang & Nút' }, { id: 'advanced', label: 'Bộ nhớ đệm & Nâng cao' } ];
   const THUMB_META = { javfree:    { label: 'javfree.me',     color: '#16a34a' }, projectjav: { label: 'projectjav.com', color: '#ca8a04' }, javstore:   { label: 'javstore.net',   color: '#dc2626' } };
   const CACHE_CATEGORIES = typeof Ui?.getCacheCategories === 'function' ? Ui.getCacheCategories() : [];
@@ -4387,7 +3916,7 @@
    document.getElementById('jav-settings-overlay')?.remove(); injectSettingsPanelStyles(); const overlay = document.createElement('div'); overlay.id = 'jav-settings-overlay';
    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
    const panel = document.createElement('div'); panel.id = 'jav-settings-panel';
-   panel.innerHTML =`<div class="sp-header"><div><div class="sp-title">Cài đặt JAV Lái Xe</div></div><button class="sp-close" type="button" title="Đóng">×</button></div><div class="sp-body"><div class="sp-layout"><nav class="sp-nav" aria-label="Danh mục cài đặt" role="tablist">${renderSectionNav()}</nav><div class="sp-content"><section class="sp-section is-active" data-sp-panel="common" role="tabpanel"><div class="sp-section-head"><div class="sp-section-title">Phổ biến</div></div><div class="sp-settings-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Phím tắt trang chủ</strong><small>Hiện các thao tác nhanh trên thẻ danh sách</small></span><span class="sp-toggle"><input id="sp-list-preview" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Dịch tiêu đề</strong><small>Chọn dịch tiêu đề danh sách, chi tiết hoặc tất cả</small></span><select class="sp-select" id="sp-title-translate"><option value="list">Danh sách</option><option value="detail">Chi tiết</option><option value="all">Tất cả</option><option value="off">Tắt</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ngôn ngữ dịch tiêu đề</strong><small>Chọn ngôn ngữ muốn dịch sang</small></span><select class="sp-select" id="sp-title-translate-lang"><option value="vi">Tiếng Việt</option><option value="en">English</option><option value="zh-CN">Tiếng Trung (Giản thể)</option><option value="zh-TW">Tiếng Trung (Phồn thể)</option></select></label><label class="sp-setting-row" style="display:none;"><span class="sp-setting-copy"><strong>Dịch tiêu đề danh sách thẻ</strong></span><span class="sp-toggle"><input id="sp-title-translate-list" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Mở trang trong tab mới</strong><small>Mở liên kết danh sách trong tab mới</small></span><span class="sp-toggle"><input id="sp-list-new-tab" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Chế độ thẻ dọc</strong><small>Dùng thẻ dọc tối ưu hơn cho ảnh bìa</small></span><span class="sp-toggle"><input id="sp-portrait-cards" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Hiệu ứng nổi thẻ</strong><small>Thu phóng ảnh bìa luôn bật, không bị ảnh hưởng</small></span><span class="sp-toggle"><input id="sp-card-fx" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Xem trước ảnh bìa lớn</strong><small>Rê chuột để xem trước ảnh bìa HD</small></span><span class="sp-toggle"><input id="sp-cover-hover-preview" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Hiện trực tiếp ảnh xem trước</strong><small>Mở rộng trực tiếp ảnh xem trước ở trang chi tiết</small></span><span class="sp-toggle"><input id="sp-detail-preview" type="checkbox"><span class="sp-toggle-track"></span></span></label></div></section><section class="sp-section" data-sp-panel="layout" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Giao diện</div></div><div class="sp-settings-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>JavDB sắp xếp theo ngày phát hành</strong><small>Mặc định sắp xếp danh sách theo ngày phát hành</small></span><span class="sp-toggle"><input id="sp-javdb-release-sort" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Mặc định mở đánh giá</strong><small>Mở danh sách đánh giá ngắn khi vào trang chi tiết</small></span><span class="sp-toggle"><input id="sp-reviews-expanded" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cỡ chữ đánh giá</strong><small>Chỉnh kích thước chữ khu vực đánh giá</small></span><select class="sp-select" id="sp-review-font"><option value="small">Nhỏ</option><option value="medium">Vừa</option><option value="large">Lớn</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Tab mặc định chi tiết JavDB</strong><small>Nội dung ưu tiên hiển thị khi mở trang chi tiết</small></span><select class="sp-select" id="sp-api-tab"><option value="reviews">Đánh giá</option><option value="magnets">Magnet</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Đánh dấu diễn viên yêu thích</strong><small>Làm nổi bật diễn viên đã lưu trên trang tác phẩm</small></span><span class="sp-toggle"><input id="sp-actor-highlight" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Thông tin diễn viên</strong><small>Hiển thị thông tin diễn viên trên trang chi tiết tác phẩm</small></span><span class="sp-toggle"><input id="sp-actor-info" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ảnh bìa JavDB không watermark</strong><small>Thay thế bằng ảnh bìa không watermark từ JavDB APP CDN</small></span><span class="sp-toggle"><input id="sp-javdb-app-cover" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Khôi phục cuộn vô tận</strong><small>Khôi phục nội dung đã tải khi tải lại hoặc quay lại</small></span><span class="sp-toggle"><input id="sp-infinite-scroll-restore" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cuộn vô tận (Waterfall)</strong><small>Tự động tải thêm khi cuộn xuống cuối danh sách</small></span><span class="sp-toggle"><input id="sp-infinite-scroll" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Hiển thị tìm kiếm tổng hợp</strong><small>Cách hiển thị khu vực magnet ở trang chi tiết</small></span><select class="sp-select" id="sp-magnet-display"><option value="sidebar">Bảng magnet độc lập</option><option value="native-replace">Tăng cường trang gốc</option><option value="native">Tắt</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Tab mặc định trang gốc</strong><small>Ưu tiên hiển thị khi dùng tăng cường trang gốc</small></span><select class="sp-select" id="sp-native-magnet-tab"><option value="native">Trang gốc</option><option value="aggregate">Kết quả tổng hợp</option></select></label></div></section><section class="sp-section" data-sp-panel="search" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Tìm kiếm & Phát</div></div><div class="sp-settings-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Công cụ magnet mặc định</strong><small>Công cụ mặc định dùng cho tìm kiếm tổng hợp</small></span><select class="sp-select" id="sp-default-engine"></select></label><div class="sp-setting-row sp-engine-editor"><span class="sp-setting-copy"><strong>Tên miền công cụ magnet</strong><small>Chọn công cụ và sửa đổi tên miền</small></span><div class="sp-engine-controls"><select class="sp-select" id="sp-engine-picker"></select><input class="sp-input" id="sp-engine-domain"></div></div><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Sắp xếp magnet</strong><small>Cách sắp xếp mặc định của danh sách magnet</small></span><select class="sp-select" id="sp-magnet-sort"><option value="size">Dung lượng</option><option value="newest">Mới nhất</option><option value="oldest">Cũ nhất</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Trình phát 115</strong><small>Cách phát kết quả khớp 115</small></span><select class="sp-select" id="sp-pan115-player"><option value="official">Chính thức</option><option value="115master">Master</option><option value="potplayer">PotPlayer</option></select></label><div class="sp-subsection-title">Phát phim đầy đủ</div><div class="sp-full-video-block"><div class="sp-full-video-controls"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Bật phát phim</strong><small>Tải trình phát phim đầy đủ trên ảnh bìa chi tiết</small></span><span class="sp-toggle"><input id="sp-full-video-playback" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Phiên bản ưu tiên</strong><small>Ưu tiên lựa chọn, tự chuyển bản thường nếu không có</small></span><select class="sp-select" id="sp-full-video-preference"><option value="censored">Mặc định có che (Censored)</option><option value="uncensored">Ưu tiên không che (Uncensored)</option><option value="subtitle">Ưu tiên phụ đề</option></select></label></div></div><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Phát chuyển tiếp trailer</strong><small>Dùng máy chủ trung chuyển để phát trailer</small></span><span class="sp-toggle"><input id="sp-trailer-proxy-playback" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Trailer HD</strong><small>Phát tối đa 4K, khi tắt tối đa 720P</small></span><span class="sp-toggle"><input id="sp-trailer-multi-quality" type="checkbox"><span class="sp-toggle-track"></span></span></label><div class="sp-order-block"><div class="sp-setting-copy"><strong>Thứ tự nguồn ảnh xem trước</strong><small>Dùng nút mũi tên để điều chỉnh ưu tiên</small></div><div class="sp-order-list" id="sp-thumb-order"></div></div></div></section><section class="sp-section" data-sp-panel="sites" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Trang web & Nút</div></div><div class="sp-settings-grid sp-button-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cổng tìm kiếm mặc định</strong><small>Trang tìm kiếm dùng khi mở menu chuyển hướng</small></span><select class="sp-select" id="sp-jump-engine"></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cổng video mặc định</strong><small>Trang web mở mặc định của nút video</small></span><select class="sp-select" id="sp-video-engine"></select></label><div class="sp-subsection-title">Bật/Tắt nút chuyển trang</div> ${renderButtonToggles()} </div></section><section class="sp-section" data-sp-panel="advanced" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Bộ nhớ đệm & Nâng cao</div></div><div class="sp-settings-grid"> ${renderCacheControls()} </div></section></div></div></div><div class="sp-footer"><div class="sp-footer-links"><a class="sp-footer-link" href="https://t.me/+cE2dFwl5DFM5YTBl" target="_blank" rel="noopener noreferrer">Nhóm TG</a><span class="sp-footer-sep"></span><a class="sp-footer-link" href="https://github.com/ZiPenOk/scripts" target="_blank" rel="noopener noreferrer">Github</a><span class="sp-footer-sep"></span><a class="sp-footer-link" href="https://sleazyfork.org/zh-CN/scripts/576375-jav%E8%80%81%E5%8F%B8%E6%9C%BA-%E6%96%B0/feedback" target="_blank" rel="noopener noreferrer">Phản hồi</a><span class="sp-footer-sep"></span><span class="sp-footer-link" style="cursor:default;color:#94a3b8;">v${SCRIPT_VERSION}</span></div><button class="sp-btn sp-btn-cancel" type="button">Hủy</button><button class="sp-btn sp-btn-save" type="button">Lưu cài đặt</button></div>`;
+   panel.innerHTML =`<div class="sp-header"><div><div class="sp-title">Cài đặt JAV Lái Xe</div></div><button class="sp-close" type="button" title="Đóng">×</button></div><div class="sp-body"><div class="sp-layout"><nav class="sp-nav" aria-label="Danh mục cài đặt" role="tablist">${renderSectionNav()}</nav><div class="sp-content"><section class="sp-section is-active" data-sp-panel="common" role="tabpanel"><div class="sp-section-head"><div class="sp-section-title">Phổ biến</div></div><div class="sp-settings-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Phím tắt trang chủ</strong><small>Hiện các thao tác nhanh trên thẻ danh sách</small></span><span class="sp-toggle"><input id="sp-list-preview" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Dịch tiêu đề</strong><small>Chọn dịch tiêu đề danh sách, chi tiết hoặc tất cả</small></span><select class="sp-select" id="sp-title-translate"><option value="list">Danh sách</option><option value="detail">Chi tiết</option><option value="all">Tất cả</option><option value="off">Tắt</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ngôn ngữ dịch tiêu đề</strong><small>Chọn ngôn ngữ muốn dịch sang</small></span><select class="sp-select" id="sp-title-translate-lang"><option value="vi">Tiếng Việt</option><option value="en">English</option><option value="zh-CN">Tiếng Trung (Giản thể)</option><option value="zh-TW">Tiếng Trung (Phồn thể)</option></select></label><label class="sp-setting-row" style="display:none;"><span class="sp-setting-copy"><strong>Dịch tiêu đề danh sách thẻ</strong></span><span class="sp-toggle"><input id="sp-title-translate-list" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Mở trang trong tab mới</strong><small>Mở liên kết danh sách trong tab mới</small></span><span class="sp-toggle"><input id="sp-list-new-tab" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Chế độ thẻ dọc</strong><small>Dùng thẻ dọc tối ưu hơn cho ảnh bìa</small></span><span class="sp-toggle"><input id="sp-portrait-cards" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Hiệu ứng nổi thẻ</strong><small>Thu phóng ảnh bìa luôn bật, không bị ảnh hưởng</small></span><span class="sp-toggle"><input id="sp-card-fx" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Xem trước ảnh bìa lớn</strong><small>Rê chuột để xem trước ảnh bìa HD</small></span><span class="sp-toggle"><input id="sp-cover-hover-preview" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Hiện trực tiếp ảnh xem trước</strong><small>Mở rộng trực tiếp ảnh xem trước ở trang chi tiết</small></span><span class="sp-toggle"><input id="sp-detail-preview" type="checkbox"><span class="sp-toggle-track"></span></span></label></div></section><section class="sp-section" data-sp-panel="layout" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Giao diện</div></div><div class="sp-settings-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>JavDB sắp xếp theo ngày phát hành</strong><small>Mặc định sắp xếp danh sách theo ngày phát hành</small></span><span class="sp-toggle"><input id="sp-javdb-release-sort" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Mặc định mở đánh giá</strong><small>Mở danh sách đánh giá ngắn khi vào trang chi tiết</small></span><span class="sp-toggle"><input id="sp-reviews-expanded" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cỡ chữ đánh giá</strong><small>Chỉnh kích thước chữ khu vực đánh giá</small></span><select class="sp-select" id="sp-review-font"><option value="small">Nhỏ</option><option value="medium">Vừa</option><option value="large">Lớn</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Tab mặc định chi tiết JavDB</strong><small>Nội dung ưu tiên hiển thị khi mở trang chi tiết</small></span><select class="sp-select" id="sp-api-tab"><option value="reviews">Đánh giá</option><option value="magnets">Magnet</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Đánh dấu diễn viên yêu thích</strong><small>Làm nổi bật diễn viên đã lưu trên trang tác phẩm</small></span><span class="sp-toggle"><input id="sp-actor-highlight" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Thông tin diễn viên</strong><small>Hiển thị thông tin diễn viên trên trang chi tiết tác phẩm</small></span><span class="sp-toggle"><input id="sp-actor-info" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ảnh bìa JavDB không watermark</strong><small>Thay thế bằng ảnh bìa không watermark từ JavDB APP CDN</small></span><span class="sp-toggle"><input id="sp-javdb-app-cover" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Khôi phục cuộn vô tận</strong><small>Khôi phục nội dung đã tải khi tải lại hoặc quay lại</small></span><span class="sp-toggle"><input id="sp-infinite-scroll-restore" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cuộn vô tận (Waterfall)</strong><small>Tự động tải thêm khi cuộn xuống cuối danh sách</small></span><span class="sp-toggle"><input id="sp-infinite-scroll" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Hiển thị tìm kiếm tổng hợp</strong><small>Cách hiển thị khu vực magnet ở trang chi tiết</small></span><select class="sp-select" id="sp-magnet-display"><option value="sidebar">Bảng magnet độc lập</option><option value="native-replace">Tăng cường trang gốc</option><option value="native">Tắt</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Tab mặc định trang gốc</strong><small>Ưu tiên hiển thị khi dùng tăng cường trang gốc</small></span><select class="sp-select" id="sp-native-magnet-tab"><option value="native">Trang gốc</option><option value="aggregate">Kết quả tổng hợp</option></select></label></div></section><section class="sp-section" data-sp-panel="search" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Tìm kiếm & Phát</div></div><div class="sp-settings-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Công cụ magnet mặc định</strong><small>Công cụ mặc định dùng cho tìm kiếm tổng hợp</small></span><select class="sp-select" id="sp-default-engine"></select></label><div class="sp-setting-row sp-engine-editor"><span class="sp-setting-copy"><strong>Tên miền công cụ magnet</strong><small>Chọn công cụ và sửa đổi tên miền</small></span><div class="sp-engine-controls"><select class="sp-select" id="sp-engine-picker"></select><input class="sp-input" id="sp-engine-domain"></div></div><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Sắp xếp magnet</strong><small>Cách sắp xếp mặc định của danh sách magnet</small></span><select class="sp-select" id="sp-magnet-sort"><option value="size">Dung lượng</option><option value="newest">Mới nhất</option><option value="oldest">Cũ nhất</option></select></label><div class="sp-subsection-title">Phát phim đầy đủ</div><div class="sp-full-video-block"><div class="sp-full-video-controls"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Bật phát phim</strong><small>Tải trình phát phim đầy đủ trên ảnh bìa chi tiết</small></span><span class="sp-toggle"><input id="sp-full-video-playback" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Phiên bản ưu tiên</strong><small>Ưu tiên lựa chọn, tự chuyển bản thường nếu không có</small></span><select class="sp-select" id="sp-full-video-preference"><option value="censored">Mặc định có che (Censored)</option><option value="uncensored">Ưu tiên không che (Uncensored)</option><option value="subtitle">Ưu tiên phụ đề</option></select></label></div></div><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Phát chuyển tiếp trailer</strong><small>Dùng máy chủ trung chuyển để phát trailer</small></span><span class="sp-toggle"><input id="sp-trailer-proxy-playback" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Trailer HD</strong><small>Phát tối đa 4K, khi tắt tối đa 720P</small></span><span class="sp-toggle"><input id="sp-trailer-multi-quality" type="checkbox"><span class="sp-toggle-track"></span></span></label><div class="sp-order-block"><div class="sp-setting-copy"><strong>Thứ tự nguồn ảnh xem trước</strong><small>Dùng nút mũi tên để điều chỉnh ưu tiên</small></div><div class="sp-order-list" id="sp-thumb-order"></div></div></div></section><section class="sp-section" data-sp-panel="sites" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Trang web & Nút</div></div><div class="sp-settings-grid sp-button-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cổng tìm kiếm mặc định</strong><small>Trang tìm kiếm dùng khi mở menu chuyển hướng</small></span><select class="sp-select" id="sp-jump-engine"></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cổng video mặc định</strong><small>Trang web mở mặc định của nút video</small></span><select class="sp-select" id="sp-video-engine"></select></label><div class="sp-subsection-title">Bật/Tắt nút chuyển trang</div> ${renderButtonToggles()} </div></section><section class="sp-section" data-sp-panel="advanced" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Bộ nhớ đệm & Nâng cao</div></div><div class="sp-settings-grid"> ${renderCacheControls()} </div></section></div></div></div><div class="sp-footer"><div class="sp-footer-links"><a class="sp-footer-link" href="https://t.me/+cE2dFwl5DFM5YTBl" target="_blank" rel="noopener noreferrer">Nhóm TG</a><span class="sp-footer-sep"></span><a class="sp-footer-link" href="https://github.com/ZiPenOk/scripts" target="_blank" rel="noopener noreferrer">Github</a><span class="sp-footer-sep"></span><a class="sp-footer-link" href="https://sleazyfork.org/zh-CN/scripts/576375-jav%E8%80%81%E5%8F%B8%E6%9C%BA-%E6%96%B0/feedback" target="_blank" rel="noopener noreferrer">Phản hồi</a><span class="sp-footer-sep"></span><span class="sp-footer-link" style="cursor:default;color:#94a3b8;">v${SCRIPT_VERSION}</span></div><button class="sp-btn sp-btn-cancel" type="button">Hủy</button><button class="sp-btn sp-btn-save" type="button">Lưu cài đặt</button></div>`;
    overlay.appendChild(panel); document.body.appendChild(overlay); const navItems = [...panel.querySelectorAll('[data-sp-section]')]; const sectionPanels = [...panel.querySelectorAll('[data-sp-panel]')];
    navItems.forEach(item => item.addEventListener('click', () => {
     const section = item.dataset.spSection;
@@ -4566,7 +4095,6 @@
  const QuickSettingsPanel = (() => {
   const siteLabelMap = { javbus: 'JavBus', javdb: 'JavDB', javlib: 'JavLibrary', pan115: '115 Cloud' };
   const TOGGLE_META = [
-   { id: 'pan115', label: 'Khớp 115', cfgKey: 'btnShowPan115', sync: 'syncPan115' },
    { id: 'infinite-scroll', label: 'Cuộn vô tận', cfgKey: 'infiniteScroll', sync: 'syncInfiniteScroll' },
    { id: 'card-fx', label: 'Hiệu ứng nổi thẻ', cfgKey: 'cardFx', sync: 'syncCardFx', mobileDisabled: true },
    { id: 'cover-hover-preview', label: 'Xem trước ảnh bìa lớn', cfgKey: 'coverHoverPreview', sync: 'syncCoverHoverPreview', mobileDisabled: true },
@@ -4577,7 +4105,7 @@
    { id: 'detail-preview-inline', label: 'Hiện ảnh xem trước chi tiết', cfgKey: 'detailPreviewInline', sync: 'syncDetailPreview', mobileDisabled: true },
    { id: 'actor-info', label: 'Thông tin diễn viên', cfgKey: 'actorInfoEnabled', sync: 'syncActorInfo', detailOnly: true }, ];
   const TOGGLE_META_EXTRA = [ { id: 'actor-highlight', label: 'Đánh dấu diễn viên yêu thích', cfgKey: 'javdbFavoriteActorHighlight', sync: 'syncFavoriteActorHighlight' } ];
-  const PAN115_TOGGLE_META = [ { id: 'pan115-cover-hover-preview', label: 'Xem trước bìa 115', cfgKey: 'pan115CoverHoverPreview', sync: 'syncCoverHoverPreview', mobileDisabled: true } ];
+  const PAN115_TOGGLE_META = [];
   function renderToggleRows(toggleMeta = TOGGLE_META) {
    return toggleMeta.map(({ id, label, mobileDisabled }) =>`<div class="qs-switch-row"${mobileDisabled ? ' data-mobile-disabled="1"' : ''}><div class="qs-name">${label}</div><label class="qs-toggle"><input id="qs-${id}" type="checkbox"><span class="qs-toggle-track"></span></label></div>`).join('');
   }
@@ -4811,95 +4339,16 @@
   return { install, sync };
  })();
  Core.expose('__LAOSIJI_MOBILE_SETTINGS_ENTRY__', MobileSettingsEntry);
- const Pan115SettingsEntry = (() => {
-  const ENTRY_ID = 'jav-pan115-settings-entry'; let observer = null; let pending = false;
-  function is115Page() { return /^(?:www\.)?115\.com$/i.test(location.hostname); }
-  function ensureStyle() {
-   injectStyle('jav-pan115-settings-entry-style',`#${ENTRY_ID}{display:inline-flex;align-items:center;vertical-align:top;height:34px;box-sizing:border-box;color:#3a4783!important;white-space:nowrap}#${ENTRY_ID}:hover{color:#263365!important;background:#f4f6ff!important}#${ENTRY_ID}:focus-visible{outline:2px solid rgba(58,71,131,.45);outline-offset:1px}#${ENTRY_ID} .entry-icon{display:inline-flex;align-items:center;font-size:16px;line-height:1}#${ENTRY_ID}.is-modern{height:32px;margin:0;padding:0 12px;border:1px solid #d1d4d6;border-radius:4px;background:#fff;color:#4b5563!important;font-size:14px;line-height:1;cursor:pointer}#${ENTRY_ID}.is-modern:hover{background:#f9fafb!important;color:#111827!important}`);
-  }
-  function scheduleSync() {
-   if (pending) return;
-   pending = true;
-   requestAnimationFrame(() => {
-    pending = false; sync();
-   }); }
-  function isDisplayed(element) {
-   if (!element) return false;
-   const style = window.getComputedStyle?.(element);
-   if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
-   return !!(element.getClientRects?.().length || element.offsetWidth || element.offsetHeight); }
-  function createEntry(modern = false) {
-   const entry = document.createElement(modern ? 'button' : 'a'); entry.id = ENTRY_ID; entry.className = modern ? 'is-modern flex items-center gap-1' : 'button btn-line';
-   if (modern) entry.type = 'button';
-   else entry.href = 'javascript:void(0)';
-   entry.title = 'Mở cài đặt nhanh JAV Lái Xe'; entry.setAttribute('aria-label', 'Mở cài đặt nhanh JAV Lái Xe');
-   entry.innerHTML =`<span class="entry-icon" aria-hidden="true">⚙</span><span>Cài đặt Lái Xe</span>`;
-   entry.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); QuickSettingsPanel.open(event.currentTarget); });
-   return entry; }
-  function sync() {
-   const existing = document.getElementById(ENTRY_ID);
-   if (!is115Page()) { existing?.remove(); return; }
-   const modernHeader = [...document.querySelectorAll('.justify-between.w-full.pl-6.pr-5')] .find(root => isDisplayed(root) && root.querySelector('button[title="Thao tác khác"]')); const modernMoreButton = modernHeader?.querySelector('button[title="Thao tác khác"]');
-   const modernActionGroup = modernMoreButton?.parentElement;
-   if (modernActionGroup) {
-    if (existing && existing.parentElement !== modernActionGroup) existing.remove();
-    if (existing) return;
-    const viewModeGroup = modernActionGroup.querySelector('button[title="Chế độ xem danh sách"]')?.parentElement; const entry = createEntry(true); modernActionGroup.insertBefore(entry, viewModeGroup || modernMoreButton); return; }
-   const topBar = document.querySelector('#js_top_panel_box .left-tvf[rel="left_tvf"]');
-   if (topBar) {
-    if (existing && existing.parentElement !== topBar) existing.remove();
-    if (existing) return;
-    const entry = createEntry(); const previewButton = topBar.querySelector('.master-preview-switch-btn');
-    if (previewButton) previewButton.insertAdjacentElement('afterend', entry);
-    else topBar.appendChild(entry);
-    return; } }
-  function install() {
-   if (observer) return;
-   ensureStyle(); sync(); const root = document.body || document.documentElement;
-   if (!root || typeof MutationObserver === 'undefined') return;
-   observer = new MutationObserver(scheduleSync);
-   observer.observe(root, { childList: true, subtree: true }); }
-  return { install, sync };
- })();
+ const Pan115SettingsEntry = {
+  install() {},
+  sync() {},
+ };
  Core.expose('__LAOSIJI_PAN115_SETTINGS_ENTRY__', Pan115SettingsEntry);
  const MagnetActions = (() => {
   const { parseJson } = MagnetApi;
-  async function offline115(maglink) {
-   maglink = maglink.substring(0, 60);
-   const loginUrl = 'https://115.com/?mode=login';
-   const offlineUrl = 'https://115.com/?tab=offline&mode=wangpan';
-   const tokenR = await gmFetch(`https://115.com/?ct=offline&ac=space&_=${Date.now()}`, {
-    headers: {
-     Accept: 'application/json, text/plain, */*',
-     Referer: offlineUrl, },
-   });
-   if (!tokenR.loadstuts) { notify('115 Lỗi', 'Không thể lấy chữ ký, vui lòng kiểm tra quyền cross-origin hoặc trạng thái đăng nhập 115', loginUrl); return; }
-   if (tokenR.responseText.includes('html')) { notify('115 Chưa đăng nhập', 'Vui lòng đăng nhập tài khoản 115 trước khi tải offline', loginUrl); return; }
-   const json = parseJson(tokenR.responseText);
-   if (!json?.sign || !json?.time) { notify('115 Lỗi', 'Chữ ký trả về bất thường, vui lòng xác nhận 115 đã đăng nhập và cho phép truy cập cross-origin', offlineUrl); return; }
-   const uid = readStoredValue('jav_115_uid', '');
-   const response = await gmFetch('https://115.com/web/lixian/?ct=lixian&ac=add_task_url', {
-    method: 'POST',
-    timeout: 20000,
-    headers: {
-     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-     Accept: 'application/json, text/javascript, */*; q=0.01',
-     Origin: 'https://115.com',
-     Referer: offlineUrl,
-     'X-Requested-With': 'XMLHttpRequest', },
-    data:`url=${encodeURIComponent(maglink)}&uid=${uid}&sign=${json.sign}&time=${json.time}`,
-   });
-   if (!response.ok) {
-    const kind = response.error?.kind;
-    if (kind === 'timeout') notify('115 Tải ngoại tuyến thất bại', 'Yêu cầu đẩy quá thời gian (timeout), vui lòng thử lại sau', offlineUrl);
-    else if (kind === 'network') notify('115 Tải ngoại tuyến thất bại', 'Yêu cầu đẩy thất bại, vui lòng kiểm tra quyền CORS hoặc kết nối mạng', offlineUrl);
-    else if (kind === 'abort') notify('115 Tải ngoại tuyến thất bại', 'Yêu cầu đẩy đã bị hủy, có thể quyền CORS bị từ chối', offlineUrl);
-    else notify('115 Tải ngoại tuyến thất bại',`Yêu cầu thất bại: HTTP ${response.status || 0}`, offlineUrl);
-    return; }
-   const res = parseJson(response.responseText);
-   if (!res) { notify('115 Tải ngoại tuyến thất bại', '115 trả về bất thường, có thể phiên đăng nhập hết hạn hoặc chưa cấp đủ quyền CORS', offlineUrl); return; }
-   if (res.state) { notify('115 Tải ngoại tuyến thành công', 'Đã thêm tác vụ', offlineUrl); return; }
-   const msg = res.errcode === '911' ? 'Tài khoản hoạt động bất thường, vui lòng xác thực thủ công' : (res.error_msg || res.msg || res.error || 'Lỗi không xác định'); notify('115 Tải offline thất bại', msg, offlineUrl); }
+  async function offline115() {
+   notify('115', 'Chức năng 115 đã được tắt trong bản này.');
+  }
   function formatBytes(bytes) {
    const num = Number(bytes) || 0;
    if (!num) return '-';
@@ -5476,8 +4925,7 @@
     setTimeout(() => { copyButton.textContent = 'Sao chép'; }, 900);
    });
    const checkButton = createButton('Kiểm tra', 'laosiji-native-magnet-action laosiji-native-magnet-action-check', () => { MagnetActions.checkWhatslink(item.maglink); });
-   const offlineButton = createButton('Tải 115', 'laosiji-native-magnet-action laosiji-native-magnet-action-offline', () => { MagnetActions.offline115(item.maglink); });
-   actions.append(copyButton, checkButton, offlineButton); }
+   actions.append(copyButton, checkButton); }
   function appendActions(actions, item) {
    if (item.assistant?.group) { item.assistant.group._laosijiNativeOrigin = item.assistant; actions.appendChild(item.assistant.group); return; }
    appendFallbackActions(actions, item); }
@@ -9654,28 +9102,8 @@
   function usesAggregateMagnetPanel() { return MobilePolicy.isMobile() || CFG.magnetDisplayMode === 'native-replace'; }
   function visibleActions() { return enabled() ? ACTIONS : []; }
   function syncSukebeiOfflineButton(card) {
-   if (cardSite(card) !== 'sukebei') return;
-   const cells = [...card.children].filter(child => child.matches?.('td')); const linkCell = cells.find(cell => cell.querySelector('a[href^="magnet:"]')); const magnetLink = linkCell?.querySelector('a[href^="magnet:"]');
-   const existing = card.querySelector('.jav-sukebei-offline-115'); const assistantGroup = linkCell?.querySelector('.mag-btn-group[data-mag-assistant="1"]');
-   if (!linkCell || !magnetLink) { existing?.remove(); return; }
-   if (assistantGroup) { existing?.remove(); return; }
-   const magnet = magnetLink.getAttribute('href') || magnetLink.href;
-   if (existing) {
-    existing.dataset.magnet = magnet;
-    if (existing.parentNode !== linkCell) linkCell.appendChild(existing);
-    return; }
-   const button = document.createElement('a'); button.href = '#'; button.className = 'jav-sukebei-offline-115'; button.title = 'Đẩy sang 115'; button.setAttribute('aria-label', 'Đẩy sang 115'); button.dataset.magnet = magnet;
-   button.innerHTML = '<i class="fa fa-cloud-upload"></i>';
-   button.addEventListener('click', async e => {
-    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation?.();
-    if (button.dataset.loading === '1') return;
-    button.dataset.loading = '1';
-    try {
-     await MagnetActions.offline115(button.dataset.magnet || magnet);
-    } finally {
-     delete button.dataset.loading; }
-   }, true);
-   magnetLink.insertAdjacentElement('afterend', button); }
+   card.querySelector('.jav-sukebei-offline-115')?.remove();
+  }
   function openMagnetPopup(code) {
    if (!code) return;
    closeMagnetPopup(); ensureStyle(); const overlay = document.createElement('div'); overlay.className = 'jav-card-magnet-overlay';
@@ -13159,323 +12587,25 @@ function bindJumpMenu(menuDiv, toggleBtn, subMenu, mainBtn = null) {
  function addJumpLineBreak(container) {
   const lineBreak = document.createElement('span'); lineBreak.className = 'jav-jump-line-break'; lineBreak.style.cssText = 'flex-basis:100%;height:0;padding:0;margin:0;'; container.appendChild(lineBreak); }
  let pan115ChooserOverlay = null;
- function normalizePan115Matches(value) {
-  return (Array.isArray(value) ? value : value?.pickcode ? [value] : []) .filter(item => item?.pickcode); }
- function pan115DisplayLabel(base, matches) {
-  return matches.length > 1 ? `${base}×${matches.length}` : base;
- }
- function pan115MatchTitle(matches, code) {
-  return normalizePan115Matches(matches) .map(item => [item.name, item.sizeText || Pan115.formatSize(item.size)].filter(Boolean).join(' · '))
-   .join('\n') || `Phát 115: ${Pan115.normalizeKeepSeparator(code)}`;
- }
- function refreshPan115Control(control, code, matches) {
-  const list = normalizePan115Matches(matches);
-  if (!control?.isConnected) return;
-  if (!list.length) { control.remove(); return; }
-  const best = list[0]; const isBadge = control.classList.contains('jav-pan115-badge'); const base = isBadge ? 'Khớp 115' : 'Phát 115'; control.textContent = pan115DisplayLabel(base, list); control.title = pan115MatchTitle(list, code);
-  control.dataset.pickcode = best.pickcode; control.dataset.pan115Code = Pan115.normalizeKeepSeparator(code) || code || '';
-  if (control.tagName === 'A' && !Pan115.isPotPlayerMode() && list.length === 1) { control.href = Pan115.playUrl(best.pickcode); }
- }
- function refreshPan115ControlsForCode(code, matches, trigger = null) {
-  const normalized = Pan115.normalizeKeepSeparator(code) || code || ''; const controls = new Set();
-  if (trigger) controls.add(trigger);
-  document.querySelectorAll('.jav-pan115-badge, .jav-pan115-play-btn').forEach(control => {
-   if ((control.dataset.pan115Code || '') === normalized) controls.add(control);
-  });
-  controls.forEach(control => refreshPan115Control(control, normalized, matches)); }
- function openPan115Tab(url) {
-  if (!url) return null;
-  if (typeof GM_openInTab === 'function') {
-   try {
-    return GM_openInTab(url, { active: true, insert: true, setParent: true });
-   } catch (error) { errorLog('115 tab open via GM_openInTab failed:', error); } }
-  return window.open(url, '_blank', 'noopener,noreferrer'); }
- function playPan115Candidate(match, trigger = null) {
-  if (!match?.pickcode) return;
-  if (Pan115.isPotPlayerMode()) { playPan115Pot(match.pickcode, match.name, trigger); return; }
-  openPan115Tab(Pan115.playUrl(match.pickcode)); }
- function closePan115Chooser() { pan115ChooserOverlay?.remove(); pan115ChooserOverlay = null; document.removeEventListener('keydown', onPan115ChooserKeydown, true); }
- function onPan115ChooserKeydown(event) {
-  if (document.querySelector('.jav-pan115-confirm-overlay')) return;
-  if (event.key === 'Escape') closePan115Chooser();
- }
- function pan115Node(tag, className = '', text = null, parent = null) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== null) node.textContent = text;
-  parent?.appendChild(node); return node; }
- function pan115Button(text, className, parent, onClick = null) {
-  const button = pan115Node('button', className, text, parent); button.type = 'button';
-  if (onClick) button.addEventListener('click', onClick, true);
-  return button; }
- function confirmPan115Action(options = {}) {
-  return new Promise(resolve => {
-   const overlay = pan115Node('div', 'jav-pan115-confirm-overlay'); const dialog = pan115Node('div', 'jav-pan115-confirm', null, overlay); pan115Node('div', 'jav-pan115-confirm-title', options.title || 'Xác nhận thao tác', dialog);
-   pan115Node('div', 'jav-pan115-confirm-message', options.message || '', dialog); const actions = pan115Node('div', 'jav-pan115-confirm-actions', null, dialog);
-   const cancel = pan115Button(options.cancelText || 'Hủy', 'jav-pan115-confirm-cancel', actions, () => cleanup(false)); const confirm = pan115Button(options.confirmText || 'Xác nhận', 'jav-pan115-confirm-ok', actions, () => cleanup(true));
-   const cleanup = value => {
-    overlay.remove(); document.removeEventListener('keydown', onKeydown, true); resolve(value); };
-   const onKeydown = event => {
-    if (event.key !== 'Escape' && event.key !== 'Enter') return;
-    event.preventDefault(); event.stopImmediatePropagation(); cleanup(event.key === 'Enter'); };
-   overlay.addEventListener('click', event => {
-    if (event.target === overlay) cleanup(false);
-   }, true);
-   document.addEventListener('keydown', onKeydown, true); document.body.appendChild(overlay);
-   confirm.focus({ preventScroll: true });
-  }); }
- function promptPan115Rename(options = {}) {
-  return new Promise(resolve => {
-   const overlay = pan115Node('div', 'jav-pan115-confirm-overlay jav-pan115-rename-overlay'); const dialog = pan115Node('div', 'jav-pan115-confirm jav-pan115-rename-dialog', null, overlay);
-   pan115Node('div', 'jav-pan115-confirm-title', options.title || 'Đổi tên thủ công', dialog); const input = pan115Node('input', 'jav-pan115-rename-input', null, dialog); input.className = 'jav-pan115-rename-input'; input.type = 'text'; input.value = options.value || '';
-   input.placeholder = 'Nhập tên tệp 115 mới'; pan115Node('div', 'jav-pan115-rename-hint', options.hint || 'Sau khi xác nhận sẽ đổi tên trực tiếp, vui lòng giữ đúng phần mở rộng.', dialog); const actions = pan115Node('div', 'jav-pan115-confirm-actions', null, dialog);
-   pan115Button('Hủy', 'jav-pan115-confirm-cancel', actions, () => cleanup(null)); pan115Button('Xác nhận đổi tên', 'jav-pan115-confirm-ok jav-pan115-rename-ok', actions, () => submit());
-   const cleanup = value => {
-    overlay.remove(); document.removeEventListener('keydown', onKeydown, true); resolve(value); };
-   const submit = () => cleanup(input.value.trim() || null);
-   const onKeydown = event => {
-    if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); cleanup(null); }
-    if (event.key === 'Enter') { event.preventDefault(); event.stopImmediatePropagation(); submit(); }
-   };
-   overlay.addEventListener('click', event => {
-    if (event.target === overlay) cleanup(null);
-   }, true);
-   document.addEventListener('keydown', onKeydown, true); document.body.appendChild(overlay);
-   input.focus({ preventScroll: true });
-   input.select();
-  }); }
- async function renamePan115Candidate(context, newName, button) {
-  const { match, matches, normalized, code, nameNode, trigger } = context;
-  const nextName = String(newName || '').trim();
-  if (!match.fileId) { notify('115 Đổi tên thất bại', 'Kết quả tìm kiếm 115 không trả về ID tệp, không thể đổi tên'); return false; }
-  if (!nextName) return false;
-  if (nextName === match.name) { notify('115 Đổi tên', 'Tên tệp mới và cũ giống nhau, đã bỏ qua'); return false; }
-  const oldText = button.textContent; button.disabled = true; button.textContent = 'Đang đổi tên';
-  try {
-   await Pan115.renameFile(match.fileId, nextName); match.name = nextName;
-   if (nameNode) { nameNode.textContent = nextName; nameNode.title = nextName; }
-   Pan115.clearCached(normalized || code); refreshPan115ControlsForCode(normalized || code, matches, trigger); notify('115 Đổi tên thành công', nextName); return true;
-  } catch (error) {
-   errorLog('115 đổi tên thất bại:', error); notify('115 Đổi tên thất bại', error?.message || 'Yêu cầu đổi tên thất bại'); return false;
-  } finally {
-   button.disabled = false; button.textContent = oldText; } }
- function createPan115CandidateAction(action, context) {
-  const button = document.createElement('button'); const disabled = typeof action.disabled === 'function' && action.disabled(context); button.type = 'button';
-  button.className = `jav-pan115-candidate-action ${action.className || ''}`.trim();
-  button.dataset.pan115Action = action.key || ''; button.textContent = typeof action.label === 'function' ? action.label(context) : action.label; button.disabled = !!disabled;
-  button.title = typeof action.title === 'function' ? action.title(context) : action.title || '';
-  button.addEventListener('click', event => {
-   event.preventDefault(); event.stopImmediatePropagation();
-   if (button.disabled) return;
-   action.run(context, button);
-  }, true);
-  return button; }
- function getPan115CandidateActions() {
-  return [
-   {
-    key: 'play',
-    className: 'jav-pan115-candidate-play',
-    label: () => Pan115.isPotPlayerMode() ? 'PotPlayer' : 'Phát',
-    title: () => Pan115.isPotPlayerMode() ? 'Phát bằng PotPlayer' : 'Mở phát trên 115',
-    run: ({ match }, button) => playPan115Candidate(match, button), },
-   {
-    key: 'rename',
-    className: 'jav-pan115-candidate-rename',
-    label: 'Đổi tên',
-    disabled: ({ match }) => !match.fileId,
-    title: ({ match }) => match.fileId ? 'Đổi tên tệp 115 thủ công' : 'Kết quả tìm kiếm 115 không trả về ID tệp, không thể đổi tên',
-    async run(context, button) {
-     const suggestedName = Utils.stripDomainPrefix ? Utils.stripDomainPrefix(context.match.name || '') : (context.match.name || '');
-     const nextName = await promptPan115Rename({ value: suggestedName });
-     await renamePan115Candidate(context, nextName, button); }, },
-   {
-    key: 'delete',
-    className: 'jav-pan115-candidate-delete',
-    label: 'Xóa',
-    disabled: ({ match }) => !match.fileId,
-    title: ({ match }) => match.fileId ? 'Xóa tệp 115 này' : 'Kết quả tìm kiếm 115 không trả về ID tệp, không thể xóa',
-    async run({ match, matches, normalized, code, row, refreshDesc, trigger }, button) {
-     if (!match.fileId) return;
-     const confirmed = await confirmPan115Action({
-      title: 'Xóa tệp 115',
-      message: `Bạn có chắc chắn muốn xóa tệp này không?\n\n${match.name || match.fileId}`,
-      confirmText: 'Xóa',
-     });
-     if (!confirmed) return;
-     button.disabled = true; button.textContent = 'Đang xóa';
-     try {
-      await Pan115.deleteFile(match.fileId); const pos = matches.indexOf(match);
-      if (pos >= 0) matches.splice(pos, 1);
-      Pan115.clearCached(normalized || code); row.remove(); refreshDesc(); refreshPan115ControlsForCode(normalized || code, matches, trigger); notify('115 Xóa thành công', match.name || 'Tệp đã được xóa');
-      if (!matches.length) closePan115Chooser();
-     } catch (error) {
-      errorLog('115 xóa thất bại:', error); notify('115 Xóa thất bại', error?.message || 'Yêu cầu xóa thất bại'); button.disabled = false; button.textContent = 'Xóa'; } }, }, ]; }
- function openPan115Chooser(code, value, trigger = null) {
-  const matches = normalizePan115Matches(value);
-  if (!matches.length) return;
-  if (matches.length === 1) { playPan115Candidate(matches[0], trigger); return; }
-  closePan115Chooser(); const normalized = Pan115.normalizeKeepSeparator(code); const overlay = document.createElement('div'); overlay.className = 'jav-pan115-chooser-overlay';
-  overlay.addEventListener('click', event => {
-   if (event.target === overlay) closePan115Chooser();
-  }, true);
-  const dialog = document.createElement('div'); dialog.className = 'jav-pan115-chooser'; overlay.appendChild(dialog); const header = document.createElement('div'); header.className = 'jav-pan115-chooser-header'; dialog.appendChild(header);
-  const titleWrap = document.createElement('div'); header.appendChild(titleWrap); const title = document.createElement('div'); title.className = 'jav-pan115-chooser-title';
-  title.textContent = `Kết quả khớp 115 của ${normalized || code}`;
-  titleWrap.appendChild(title); const desc = document.createElement('div'); desc.className = 'jav-pan115-chooser-desc'; titleWrap.appendChild(desc); const close = document.createElement('button'); close.type = 'button';
-  close.className = 'jav-pan115-chooser-close'; close.textContent = '×'; close.title = 'Đóng'; close.addEventListener('click', closePan115Chooser, true); header.appendChild(close); const list = document.createElement('div');
-  list.className = 'jav-pan115-candidate-list'; dialog.appendChild(list);
-  const refreshDesc = () => {
-   desc.textContent = `Tổng cộng ${matches.length} tệp khớp, có thể chọn phát hoặc quản lý tệp.`;
-  };
-  refreshDesc();
-  matches.forEach((match, index) => {
-   const row = document.createElement('div');
-   row.className = `jav-pan115-candidate${match.lowPriorityReason ? ' is-low-priority' : ''}`;
-   list.appendChild(row); const main = document.createElement('div'); main.className = 'jav-pan115-candidate-main'; row.appendChild(main); const name = document.createElement('div'); name.className = 'jav-pan115-candidate-name';
-   name.textContent = match.name || `Tệp ${index + 1}`;
-   name.title = match.name || ''; main.appendChild(name); const meta = document.createElement('div'); meta.className = 'jav-pan115-candidate-meta';
-   meta.textContent = [match.sizeText || Pan115.formatSize(match.size), match.lowPriorityReason].filter(Boolean).join(' · ') || 'Không có thông tin dung lượng'; main.appendChild(meta); const actions = document.createElement('div');
-   actions.className = 'jav-pan115-candidate-actions'; row.appendChild(actions);
-   getPan115CandidateActions().forEach(action => { actions.appendChild(createPan115CandidateAction(action, { match, matches, normalized, code, row, nameNode: name, metaNode: meta, refreshDesc, trigger })); });
-  });
-  document.body.appendChild(overlay); pan115ChooserOverlay = overlay; document.addEventListener('keydown', onPan115ChooserKeydown, true); }
- function createPan115MatchButton(matches, code, text, useCapture = false) {
-  const list = normalizePan115Matches(matches); const best = list[0]; const button = Utils.createBtn(pan115DisplayLabel(text, list), '#00a85a', () => openPan115Chooser(code, list, button), useCapture); button.classList.add('jav-pan115-play-btn');
-  button.dataset.pickcode = best.pickcode; button.dataset.pan115Code = Pan115.normalizeKeepSeparator(code) || code || ''; button.title = pan115MatchTitle(list, code); return button; }
- function addPan115PlayBtn(code, container, useCapture = false) {
-  if (!Pan115.enabled() || !code || !container) return;
-  const normalized = Pan115.normalizeKeepSeparator(code);
-  if (!normalized || container.dataset.pan115PlayCode === normalized) return;
-  container.dataset.pan115PlayCode = normalized; const marker = document.createComment('pan115-play'); const anchor = container.querySelector('.jav-subtitle-btn, .jav-trailer-btn, .jav-preview-btn, .jav-settings-btn');
-  container.insertBefore(marker, anchor || null);
-  Pan115.searchAllCached(normalized).then(matches => {
-   const list = normalizePan115Matches(matches);
-   if (!Pan115.enabled() || !list.length || !marker.parentNode) return;
-   const btn = createPan115MatchButton(list, normalized, 'Phát 115', useCapture); marker.parentNode.insertBefore(btn, marker);
-  }).catch(err => {
-   errorLog('Tự động truy vấn 115 thất bại:', err);
-  }).finally(() => { marker.remove(); }); }
- async function playPan115Pot(pickcode, title, button = null) {
-  if (button?.dataset.pan115Loading === '1') return;
-  if (button) { button.dataset.pan115Loading = '1'; button.setAttribute('aria-busy', 'true'); }
-  try {
-   await Pan115.playPotPlayer(pickcode, title); notify('PotPlayer', 'Đã gửi link trực tiếp 115, đang khởi động trình phát');
-  } catch (error) {
-   errorLog('PotPlayer 播放失败:', error); notify('PotPlayer phát thất bại', error?.message || 'Không thể lấy link trực tiếp 115');
-  } finally {
-   if (button) { delete button.dataset.pan115Loading; button.removeAttribute('aria-busy'); }
-  } }
- function createPan115Badge(hit, code, asAnchor = true) {
-  const matches = normalizePan115Matches(hit); const best = matches[0]; const isMulti = matches.length > 1; const url = best ? Pan115.playUrl(best.pickcode) : '#';
-  const badge = document.createElement(asAnchor && !isMulti && !Pan115.isPotPlayerMode() ? 'a' : 'span'); badge.className = 'jav-pan115-badge'; badge.textContent = pan115DisplayLabel('Khớp 115', matches); badge.title = pan115MatchTitle(matches, code);
-  badge.dataset.pickcode = best?.pickcode || ''; badge.dataset.pan115Code = Pan115.normalizeKeepSeparator(code) || code || '';
-  if (isMulti) {
-   badge.setAttribute('role', 'link'); badge.tabIndex = 0;
-   const openList = event => {
-    event.preventDefault(); event.stopImmediatePropagation(); openPan115Chooser(code, matches, badge); };
-   badge.addEventListener('click', openList, true);
-   badge.addEventListener('keydown', event => {
-    if (event.key === 'Enter' || event.key === ' ') openList(event);
-   }, true);
-  } else if (Pan115.isPotPlayerMode()) {
-   if (asAnchor) badge.href = '#';
-   badge.setAttribute('role', 'link'); badge.tabIndex = 0;
-   const openPot = event => {
-    event.preventDefault(); event.stopImmediatePropagation(); playPan115Pot(best.pickcode, best.name, badge); };
-   badge.addEventListener('click', openPot, true);
-   badge.addEventListener('keydown', event => {
-    if (event.key === 'Enter' || event.key === ' ') openPot(event);
-   }, true);
-  } else if (asAnchor) {
-   badge.href = url; badge.target = '_blank'; badge.rel = 'noopener noreferrer';
-   badge.addEventListener('click', e => {
-    e.stopImmediatePropagation();
-   }, true);
-  } else {
-   badge.setAttribute('role', 'link'); badge.tabIndex = 0;
-   const open = e => {
-    e.preventDefault(); e.stopImmediatePropagation(); openPan115Tab(Pan115.playUrl(badge.dataset.pickcode)); };
-   badge.addEventListener('click', open, true);
-   badge.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') open(e);
-   }, true); }
-  return badge; }
- let pan115ListRunning = false;
- async function renderPan115ListBadges() {
-  if (!Pan115.enabled() || Pan115.isSearchBlocked?.() || pan115ListRunning || SiteManager.isDetailPage() || document.querySelector('#jav-resource-overlay')) return;
-  pan115ListRunning = true; const targets = SiteManager.collectPan115ListTargets(); const groups = new Map();
-  targets.forEach(target => {
-   const key = Pan115.normalizeKeepSeparator(target.code) || target.code; let group = groups.get(key);
-   if (!group) {
-    group = { code: target.code, targets: [] };
-    groups.set(key, group); }
-   group.targets.push(target);
-  });
-  const groupList = [...groups.values()]; const batchRender = /(?:^|\.)sukebei\.nyaa\.si$/i.test(location.hostname); const batchDelay = 140; const pendingBadges = []; let badgeFrame = 0; let batchTimer = 0;
-  const flushBadges = () => {
-   if (batchTimer) { clearTimeout(batchTimer); batchTimer = 0; }
-   badgeFrame = 0;
-   if (!Pan115.enabled()) { pendingBadges.length = 0; return; }
-   const batch = pendingBadges.splice(0);
-   batch.forEach(({ anchor, matches, code }) => {
-    if (anchor.isConnected) SiteManager.insertPan115ListBadge(anchor, matches, code);
-   }); };
-  const queueBadge = (anchor, matches, code) => {
-   pendingBadges.push({ anchor, matches, code });
-   if (batchRender) {
-    if (pendingBadges.length >= 3) {
-     flushBadges();
-    } else if (!batchTimer) {
-     batchTimer = window.setTimeout(flushBadges, batchDelay); }
-    return; }
-   if (badgeFrame) return;
-   badgeFrame = typeof window.requestAnimationFrame === 'function' ? window.requestAnimationFrame(flushBadges) : window.setTimeout(flushBadges, 0); };
-  try {
-   let nextIndex = 0;
-   const worker = async () => {
-    while (nextIndex < groupList.length && !Pan115.isSearchBlocked?.()) {
-     const group = groupList[nextIndex++]; const activeTargets = group.targets.filter(target => target.anchor?.isConnected);
-     if (!activeTargets.length) continue;
-     activeTargets.forEach(({ anchor }) => { anchor.dataset.pan115Checked = '1'; });
-     try {
-      const matches = await Pan115.searchAllCached(group.code);
-      activeTargets.forEach(({ anchor, code }) => {
-       if (anchor.isConnected) queueBadge(anchor, matches, code);
-      });
-     } catch (err) {
-      activeTargets.forEach(({ anchor }) => {
-       if (anchor.isConnected && !Pan115.isSearchBlocked?.()) delete anchor.dataset.pan115Checked;
-      });
-      errorLog('Truy vấn đơn mục danh sách 115 thất bại:', err); } } };
-   const workerCount = Math.min(batchRender ? 8 : 6, groupList.length);
-   await Promise.all(Array.from({ length: workerCount }, worker));
-  } catch (err) {
-   errorLog('Tự động truy vấn danh sách 115 thất bại:', err);
-  } finally {
-   if (pendingBadges.length && (!badgeFrame || batchRender)) flushBadges();
-   pan115ListRunning = false;
-   if (Pan115.enabled() && !Pan115.isSearchBlocked?.() && !document.querySelector('#jav-resource-overlay') && SiteManager.collectPan115ListTargets().length) schedulePan115ListBadges();
-  } }
+ function normalizePan115Matches() { return []; }
+ function closePan115Chooser() {}
+ function openPan115Chooser() {}
+ function createPan115MatchButton() { return null; }
+ function addPan115PlayBtn() {}
+ function playPan115Pot() {}
+ function createPan115Badge() { return null; }
+ async function renderPan115ListBadges() {}
  function removePan115Ui() {
-  clearTimeout(pan115ListTimer); closePan115Chooser(); document.querySelectorAll('.jav-pan115-badge, .jav-pan115-play-btn').forEach(el => el.remove());
+  clearTimeout(pan115ListTimer);
+  document.querySelectorAll('.jav-pan115-badge, .jav-pan115-play-btn').forEach(el => el.remove());
   document.querySelectorAll('[data-pan115-checked], [data-pan115-has-badge]').forEach(el => {
    delete el.dataset.pan115Checked; delete el.dataset.pan115HasBadge;
   });
-  document.querySelectorAll('[data-pan115-play-code]').forEach(el => { delete el.dataset.pan115PlayCode; }); }
- function refreshPan115PlayerLinks() {
-  if (Pan115.isPotPlayerMode()) return;
-  document.querySelectorAll('.jav-pan115-badge[data-pickcode], .jav-pan115-play-btn[data-pickcode]').forEach(el => {
-   const url = Pan115.playUrl(el.dataset.pickcode);
-   if (el.tagName === 'A') el.href = url;
-  }); }
- function forceRenderPan115Ui() {
-  refreshPan115PlayerLinks();
-  if (SiteManager.isDetailPage()) {
-   JumpButtons.render();
-  } else { schedulePan115ListBadges(); } }
- function syncPan115AfterSettingsSave(enabled = Pan115.enabled()) {
-  if (!enabled) { removePan115Ui(); return; }
-  Pan115.clearSearchBlock?.(); removePan115Ui(); setTimeout(forceRenderPan115Ui, 0); }
+  document.querySelectorAll('[data-pan115-play-code]').forEach(el => { delete el.dataset.pan115PlayCode; });
+ }
+ function refreshPan115PlayerLinks() {}
+ function forceRenderPan115Ui() {}
+ function syncPan115AfterSettingsSave() { removePan115Ui(); }
  Core.expose('__LAOSIJI_SYNC_PAN115__', syncPan115AfterSettingsSave);
  const TitleTranslate = (() => {
   const CACHE_KEY = 'title_translate_pa_cache_v1'; const CACHE_LIMIT = 500; const MAX_CONCURRENT = 3; const MODES = ['list', 'detail', 'all', 'off']; const inFlight = new Map(); const listRecords = new Map(); const queue = []; let cache = null;
@@ -14093,9 +13223,7 @@ function bindJumpMenu(menuDiv, toggleBtn, subMenu, mainBtn = null) {
    } catch (err) { errorLog('Sắp xếp lại cuộn vô tận thất bại:', err); }
    window.dispatchEvent(new Event('resize')); }, };
  Core.expose('__LAOSIJI_INFINITE_SCROLL__', InfiniteScroll); let pan115ListTimer = null;
- function schedulePan115ListBadges() {
-  if (!Pan115.enabled() || SiteManager.isDetailPage()) return;
-  clearTimeout(pan115ListTimer); pan115ListTimer = setTimeout(renderPan115ListBadges, 300); }
+ function schedulePan115ListBadges() {}
  Core.expose('__LAOSIJI_SCHEDULE_PAN115__', schedulePan115ListBadges); Core.expose('__LAOSIJI_RENDER_BUTTONS__', () => JumpButtons.render());
  const Runtime = {
   refreshTimer: null,
