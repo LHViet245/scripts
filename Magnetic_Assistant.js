@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         磁力&电驴链接助手
 // @namespace    https://github.com/ZiPenOk
-// @version      3.5.8
+// @version      3.5.11
 // @description  点击按钮显示绿色勾（验车按钮除外），支持复制（自动精简链接，保留xt和dn并提取番号）、推送到qB/115，新增磁力信息验车功能，截图轮播。
 // @icon         https://uxwing.com/wp-content/themes/uxwing/download/seo-marketing/magnet-magnetic-icon.png
 // @match        *://*/*
@@ -10,6 +10,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
+// @grant        unsafeWindow
 // @connect      *
 // @connect      whatslink.info
 // @homepageURL  https://github.com/ZiPenOk/scripts
@@ -330,8 +331,25 @@
         return otherSelectors.some(sel => parent.querySelector(sel));
     }
 
+    // 从链接里抠番号前先清干净：%XX 先解码，再剁掉 magnet 的 info hash（十六进制
+    // 串里凑出 "201013-26" 这种假番号太容易了）。
+    function stripMagnetHash(text) {
+        const raw = String(text || '');
+        // dn= 里的空格是 %20：不先解码的话，"%20" + 后面的数字会被正则拼成一个假番号。
+        let decoded = raw;
+        try { decoded = decodeURIComponent(raw); } catch (_) {}
+        return decoded.replace(/urn:btih:[a-z0-9]+/gi, ' ');
+    }
+
     function extractCodeFromText(text) {
         if (!text) return null;
+        // 老司机（「JAV老司机-新」）在场时以它为准：同页两套正则对同一条链接会给出两个不同
+        // 番号（这里曾把 ed2k 的文件大小字段 "|1723099235|" 读成 172309-923），有桥就用桥。
+        const bridge = laosijiOfflineBridge();
+        if (bridge && typeof bridge.extractCode === 'function') {
+            return bridge.extractCode(String(text)) || null;
+        }
+        text = stripMagnetHash(text);
 
         const patterns = [
             /([A-Z]{2,15})-(\d{2,10})(?:-(\d+))?/i,
@@ -753,7 +771,34 @@
         });
     }
 
+    // 老司机(「JAV老司机-新」)在同一个页面时，把 115 推送整个交给它：
+    // 它负责模板目录、离线任务、清理与规范改名，这里只做失败提示。
+    function laosijiOfflineBridge() {
+        try {
+            const pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
+            const bridge = pageWindow.__LAOSIJI_PAN115_OFFLINE__;
+            return bridge && typeof bridge.push === 'function' ? bridge : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
     function pushTo115(link) {
+        const bridge = laosijiOfflineBridge();
+        if (bridge) {
+            // 番号交给老司机自己从标题/文件名里认：这条链接是 URL 编码的，从整条链接
+            // 抠番号会把 %20 和后面的数字拼成假番号（201013-26），JavDB 就查不到了。
+            Promise.resolve(bridge.push(link, { title: document.title }))
+                .then(result => {
+                    if (result && result.ok === false) {
+                        showToast('❌ 115 推送失败: ' + (result.message || '未知错误'), false);
+                    }
+                })
+                .catch(error => showToast('❌ 115 推送异常: ' + ((error && error.message) || error), false));
+            return;
+        }
+
+        // 老司机不在场(该站点它没匹配)时回退到直连推送。
         GM_xmlhttpRequest({
             method: 'GET',
             url: 'https://115.com/?ct=offline&ac=space&_=' + Date.now(),
