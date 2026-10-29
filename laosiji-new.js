@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JAV Lái Xe - Mới
 // @namespace    https://github.com/LHViet245/scripts
-// @version      2.9.4.5-vi
+// @version      2.9.5.3-vi
 // @description  Tăng cường duyệt web và quản lý tài nguyên JAV: Thống nhất nhận diện mã phim, thao tác trang chi tiết và danh sách trên JavBus, JavDB, JavLibrary, hỗ trợ tùy chỉnh tỷ lệ bố cục; cung cấp tổng hợp magnet, khớp phát 115, đổi tên và xóa trên 115, phát phim đầy đủ, tải và xem trailer đa độ phân giải, ảnh xem trước, tải ảnh bìa 2K HD, ảnh bìa JavDB không watermark, chuyển hướng tìm kiếm liên trang, dịch tiêu đề, bố cục thẻ, thu phóng trang, thích ứng di động, xem ảnh phim, cuộn vô tận và sắp xếp theo điểm/đánh giá JavDB; hỗ trợ Trung tâm quản lý tài nguyên độc lập cho từng phân trang JavBus, JavDB, JavLibrary, thao tác hàng loạt diễn viên, tác phẩm, lịch sử đánh giá, danh sách đen cùng sao lưu/khôi phục cục bộ/WebDAV, và cung cấp lối tắt truy cập nhanh cho Sukebei, MissAV, Jable, 123AV, Emby và các trang khác.
 // @author       ZiPenOk
 // @icon         https://cloudflare-imgbed-5nw.pages.dev/file/1778560196416_laosiji.png
@@ -73,7 +73,7 @@
    return url.searchParams.get('laosiji_123av_fc2') === '1';
   } catch (_) { return false; } }
  function isCustomSpaUrl(urlLike) { return isJavdbCustomSpaUrl(urlLike) || is123AvFc2SpaUrl(urlLike); }
- const SCRIPT_VERSION = '2.9.4.5-vi'; const DEBUG_LOG = false; const ERROR_LOG = true; const PAGE_ZOOM_DEFAULT = 86; const PAGE_ZOOM_LOW_RES_DEFAULT = 100; const PAGE_ZOOM_2K_WIDTH = 2560;
+ const SCRIPT_VERSION = '2.9.5.3-vi'; const DEBUG_LOG = false; const ERROR_LOG = true; const PAGE_ZOOM_DEFAULT = 86; const PAGE_ZOOM_LOW_RES_DEFAULT = 100; const PAGE_ZOOM_2K_WIDTH = 2560;
  const getPageZoomDefault = () => {
   const screenLongSide = Math.max(window.screen?.width || 0, window.screen?.height || 0); return screenLongSide && screenLongSide < PAGE_ZOOM_2K_WIDTH ? PAGE_ZOOM_LOW_RES_DEFAULT : PAGE_ZOOM_DEFAULT; };
  const JAVDB_REVIEW_INITIAL_LIMIT = 6; const JAVDB_REVIEW_MORE_LIMIT = 20;
@@ -96,6 +96,11 @@
   sokittyUrl: { key: 'cfg_sokitty_url', def: 'w1.sokitty.me' },
   defaultEngine: { key: 'cfg_default_engine', def: 'sukebei.nyaa.si' },
   defaultVideoEngine: { key: 'default_video_engine', def: 'missav' },
+  jumpPreferredThreeSite: { key: 'jump_preferred_three_site', def: 'javbus' },
+  jumpPreferredMagnet: { key: 'jump_preferred_magnet', def: 'sukebei' },
+  jumpPreferredDatabase: { key: 'jump_preferred_database', def: 'avbase' },
+  jumpPreferredDatabaseFc2: { key: 'jump_preferred_database_fc2', def: 'fd2ppv' },
+  jumpPreferredSearch: { key: 'jump_preferred_search', def: 'duckgo' },
   pan115Player: { key: 'pan115_player_mode', def: 'official' },
   javbusCardColumns: { key: 'cfg_javbus_card_columns', def: 5, min: 2, max: 10 },
   javdbCardColumns: { key: 'cfg_javdb_card_columns', def: 5, min: 2, max: 10 },
@@ -129,6 +134,11 @@
   btnShowNyaa: { key: 'btn_show_nyaa', def: true, bool: true },
   btnShowJavbus: { key: 'btn_show_javbus', def: true, bool: true },
   btnShowJavdb: { key: 'btn_show_javdb', def: true, bool: true },
+  btnShowJavlibrary: { key: 'btn_show_javlibrary', def: true, bool: true },
+  btnShowAvbase: { key: 'btn_show_avbase', def: true, bool: true },
+  btnShowFd2ppv: { key: 'btn_show_fd2ppv', def: true, bool: true },
+  btnShowFc2cma: { key: 'btn_show_fc2cma', def: true, bool: true },
+  btnShowTorrentSearch: { key: 'btn_show_torrent_search', def: true, bool: true },
   btnShowMissav: { key: 'btn_show_missav', def: true, bool: true },
   btnShowFanza: { key: 'btn_show_fanza', def: true, bool: true },
   btnShowSearch: { key: 'btn_show_search', def: true, bool: true },
@@ -3174,21 +3184,14 @@
      dismissible: true }
    ); }, };
  const SearchEngines = [
-  { name: 'BTDigg', color: '#F60', url: (code) =>`https://btdig.com/search?q=${code}` },
-  { name: 'Taocili', color: '#DE5833', url: (code) =>`https://taocili.com/search?q=${code}` },
-  { name: 'Google', color: '#4285F4', url: (code) =>`https://www.google.com/search?q=${code}` },
-  { name: 'Bing', color: '#008373', url: (code) =>`https://www.bing.com/search?q=${code}` },
-  { name: 'DuckGo', color: '#DE5833', url: (code) =>`https://duckduckgo.com/?q=${code}` },
-  { name: 'AVBase', color: '#1d4ed8', url: (code) =>`https://www.avbase.net/works?q=${encodeURIComponent(code)}` },
-  {
-   name: 'FD2PPV',
-   color: '#0f766e',
-   fc2Only: true,
-   isAvailable: code => !!Utils.getFc2Number(code),
-   url: code => {
-    const number = Utils.getFc2Number(code);
-    return number ?`https://fd2ppv.cc/articles/${number}` : '';
-   }, }, ];
+  { key: 'btdig', name: 'BTDigg', color: '#F60', url: (code) => `https://btdig.com/search?q=${code}` },
+  { key: 'taocili', name: 'Taocili', color: '#DE5833', url: (code) => `https://taocili.com/search?q=${code}` },
+  { key: 'google', name: 'Google', color: '#4285F4', url: (code) => `https://www.google.com/search?q=${code}` },
+  { key: 'bing', name: 'Bing', color: '#008373', url: (code) => `https://www.bing.com/search?q=${code}` },
+  { key: 'duckgo', name: 'DuckGo', color: '#DE5833', url: (code) => `https://duckduckgo.com/?q=${code}` },
+  { key: 'avbase', name: 'AVBase', color: '#1d4ed8', url: (code) => `https://www.avbase.net/works/${code}` },
+  { key: 'fd2ppv', name: 'FD2PPV', color: '#ea580c', url: (code) => `https://fd2ppv.cc/article/${code}` },
+ ];
  function getAvailableSearchEngines(code) { return SearchEngines.filter(engine => !engine.isAvailable || engine.isAvailable(code)); }
  const Pan115 = {
   enabled() { return false; },
@@ -3884,16 +3887,45 @@
    { key: 'u9a9Url',         label: 'U9A9',         placeholder: 'u9a9.com' },
    { key: 'sokittyUrl',      label: 'SoKitty',      placeholder: 'w1.sokitty.me' },
   ]; const JUMP_SEARCH_ENGINES = ['BTDigg', 'Taocili', 'Google', 'Bing', 'DuckGo', 'AVBase'];
+  const THREE_SITES_OPTIONS = [
+   { key: 'javbus', label: 'JavBus' },
+   { key: 'javdb', label: 'JavDB' },
+   { key: 'javlibrary', label: 'JavLibrary' },
+  ];
+  const MAGNET_SEARCH_OPTIONS = [
+   { key: 'sukebei', label: 'Sukebei' },
+   { key: 'btdig', label: 'BTDigg' },
+   { key: 'taocili', label: 'Taocili' },
+  ];
+  const DATABASE_OPTIONS = [
+   { key: 'avbase', label: 'AVBase' },
+   { key: 'fanza', label: 'FANZA' },
+  ];
+  const DATABASE_FC2_OPTIONS = [
+   { key: 'fd2ppv', label: 'FD2PPV' },
+   { key: 'fc2cma', label: 'FC2CMA' },
+  ];
+  const SEARCH_ENGINES_OPTIONS = [
+   { key: 'duckgo', label: 'DuckGo' },
+   { key: 'google', label: 'Google' },
+   { key: 'bing', label: 'Bing' },
+  ];
   const BUTTON_TOGGLE_META = [
    { key: 'nyaa', cfgKey: 'btnShowNyaa', label: 'Sukebei' },
    { key: 'javbus', cfgKey: 'btnShowJavbus', label: 'JavBus' },
    { key: 'javdb', cfgKey: 'btnShowJavdb', label: 'JavDB' },
+   { key: 'javlibrary', cfgKey: 'btnShowJavlibrary', label: 'JavLibrary' },
+   { key: 'torrentSearch', cfgKey: 'btnShowTorrentSearch', label: 'BTDigg / Taocili' },
+   { key: 'avbase', cfgKey: 'btnShowAvbase', label: 'AVBase' },
+   { key: 'fd2ppv', cfgKey: 'btnShowFd2ppv', label: 'FD2PPV' },
+   { key: 'fc2cma', cfgKey: 'btnShowFc2cma', label: 'FC2CMA' },
    { key: 'missav', cfgKey: 'btnShowMissav', label: 'Nhóm video' },
    { key: 'fanza', cfgKey: 'btnShowFanza', label: 'FANZA' },
    { key: 'search', cfgKey: 'btnShowSearch', label: 'Nhóm tìm kiếm' },
    { key: 'subtitle', cfgKey: 'btnShowSubtitle', label: 'Phụ đề' },
    { key: 'trailer', cfgKey: 'btnShowTrailer', label: 'Trailer' },
-   { key: 'preview', cfgKey: 'btnShowPreview', label: 'Ảnh xem trước' }, ];
+   { key: 'preview', cfgKey: 'btnShowPreview', label: 'Ảnh xem trước' },
+  ];
   const PANEL_SECTIONS = [ { id: 'common', label: 'Phổ biến' }, { id: 'layout', label: 'Giao diện' }, { id: 'search', label: 'Tìm kiếm & Phát' }, { id: 'sites', label: 'Trang & Nút' }, { id: 'advanced', label: 'Bộ nhớ đệm & Nâng cao' } ];
   const THUMB_META = { javfree:    { label: 'javfree.me',     color: '#16a34a' }, projectjav: { label: 'projectjav.com', color: '#ca8a04' }, javstore:   { label: 'javstore.net',   color: '#dc2626' } };
   const CACHE_CATEGORIES = typeof Ui?.getCacheCategories === 'function' ? Ui.getCacheCategories() : [];
@@ -3916,15 +3948,18 @@
    document.getElementById('jav-settings-overlay')?.remove(); injectSettingsPanelStyles(); const overlay = document.createElement('div'); overlay.id = 'jav-settings-overlay';
    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
    const panel = document.createElement('div'); panel.id = 'jav-settings-panel';
-   panel.innerHTML =`<div class="sp-header"><div><div class="sp-title">Cài đặt JAV Lái Xe</div></div><button class="sp-close" type="button" title="Đóng">×</button></div><div class="sp-body"><div class="sp-layout"><nav class="sp-nav" aria-label="Danh mục cài đặt" role="tablist">${renderSectionNav()}</nav><div class="sp-content"><section class="sp-section is-active" data-sp-panel="common" role="tabpanel"><div class="sp-section-head"><div class="sp-section-title">Phổ biến</div></div><div class="sp-settings-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Phím tắt trang chủ</strong><small>Hiện các thao tác nhanh trên thẻ danh sách</small></span><span class="sp-toggle"><input id="sp-list-preview" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Dịch tiêu đề</strong><small>Chọn dịch tiêu đề danh sách, chi tiết hoặc tất cả</small></span><select class="sp-select" id="sp-title-translate"><option value="list">Danh sách</option><option value="detail">Chi tiết</option><option value="all">Tất cả</option><option value="off">Tắt</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ngôn ngữ dịch tiêu đề</strong><small>Chọn ngôn ngữ muốn dịch sang</small></span><select class="sp-select" id="sp-title-translate-lang"><option value="vi">Tiếng Việt</option><option value="en">English</option><option value="zh-CN">Tiếng Trung (Giản thể)</option><option value="zh-TW">Tiếng Trung (Phồn thể)</option></select></label><label class="sp-setting-row" style="display:none;"><span class="sp-setting-copy"><strong>Dịch tiêu đề danh sách thẻ</strong></span><span class="sp-toggle"><input id="sp-title-translate-list" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Mở trang trong tab mới</strong><small>Mở liên kết danh sách trong tab mới</small></span><span class="sp-toggle"><input id="sp-list-new-tab" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Chế độ thẻ dọc</strong><small>Dùng thẻ dọc tối ưu hơn cho ảnh bìa</small></span><span class="sp-toggle"><input id="sp-portrait-cards" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Hiệu ứng nổi thẻ</strong><small>Thu phóng ảnh bìa luôn bật, không bị ảnh hưởng</small></span><span class="sp-toggle"><input id="sp-card-fx" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Xem trước ảnh bìa lớn</strong><small>Rê chuột để xem trước ảnh bìa HD</small></span><span class="sp-toggle"><input id="sp-cover-hover-preview" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Hiện trực tiếp ảnh xem trước</strong><small>Mở rộng trực tiếp ảnh xem trước ở trang chi tiết</small></span><span class="sp-toggle"><input id="sp-detail-preview" type="checkbox"><span class="sp-toggle-track"></span></span></label></div></section><section class="sp-section" data-sp-panel="layout" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Giao diện</div></div><div class="sp-settings-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>JavDB sắp xếp theo ngày phát hành</strong><small>Mặc định sắp xếp danh sách theo ngày phát hành</small></span><span class="sp-toggle"><input id="sp-javdb-release-sort" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Mặc định mở đánh giá</strong><small>Mở danh sách đánh giá ngắn khi vào trang chi tiết</small></span><span class="sp-toggle"><input id="sp-reviews-expanded" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cỡ chữ đánh giá</strong><small>Chỉnh kích thước chữ khu vực đánh giá</small></span><select class="sp-select" id="sp-review-font"><option value="small">Nhỏ</option><option value="medium">Vừa</option><option value="large">Lớn</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Tab mặc định chi tiết JavDB</strong><small>Nội dung ưu tiên hiển thị khi mở trang chi tiết</small></span><select class="sp-select" id="sp-api-tab"><option value="reviews">Đánh giá</option><option value="magnets">Magnet</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Đánh dấu diễn viên yêu thích</strong><small>Làm nổi bật diễn viên đã lưu trên trang tác phẩm</small></span><span class="sp-toggle"><input id="sp-actor-highlight" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Thông tin diễn viên</strong><small>Hiển thị thông tin diễn viên trên trang chi tiết tác phẩm</small></span><span class="sp-toggle"><input id="sp-actor-info" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ảnh bìa JavDB không watermark</strong><small>Thay thế bằng ảnh bìa không watermark từ JavDB APP CDN</small></span><span class="sp-toggle"><input id="sp-javdb-app-cover" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Khôi phục cuộn vô tận</strong><small>Khôi phục nội dung đã tải khi tải lại hoặc quay lại</small></span><span class="sp-toggle"><input id="sp-infinite-scroll-restore" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cuộn vô tận (Waterfall)</strong><small>Tự động tải thêm khi cuộn xuống cuối danh sách</small></span><span class="sp-toggle"><input id="sp-infinite-scroll" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Hiển thị tìm kiếm tổng hợp</strong><small>Cách hiển thị khu vực magnet ở trang chi tiết</small></span><select class="sp-select" id="sp-magnet-display"><option value="sidebar">Bảng magnet độc lập</option><option value="native-replace">Tăng cường trang gốc</option><option value="native">Tắt</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Tab mặc định trang gốc</strong><small>Ưu tiên hiển thị khi dùng tăng cường trang gốc</small></span><select class="sp-select" id="sp-native-magnet-tab"><option value="native">Trang gốc</option><option value="aggregate">Kết quả tổng hợp</option></select></label></div></section><section class="sp-section" data-sp-panel="search" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Tìm kiếm & Phát</div></div><div class="sp-settings-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Công cụ magnet mặc định</strong><small>Công cụ mặc định dùng cho tìm kiếm tổng hợp</small></span><select class="sp-select" id="sp-default-engine"></select></label><div class="sp-setting-row sp-engine-editor"><span class="sp-setting-copy"><strong>Tên miền công cụ magnet</strong><small>Chọn công cụ và sửa đổi tên miền</small></span><div class="sp-engine-controls"><select class="sp-select" id="sp-engine-picker"></select><input class="sp-input" id="sp-engine-domain"></div></div><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Sắp xếp magnet</strong><small>Cách sắp xếp mặc định của danh sách magnet</small></span><select class="sp-select" id="sp-magnet-sort"><option value="size">Dung lượng</option><option value="newest">Mới nhất</option><option value="oldest">Cũ nhất</option></select></label><div class="sp-subsection-title">Phát phim đầy đủ</div><div class="sp-full-video-block"><div class="sp-full-video-controls"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Bật phát phim</strong><small>Tải trình phát phim đầy đủ trên ảnh bìa chi tiết</small></span><span class="sp-toggle"><input id="sp-full-video-playback" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Phiên bản ưu tiên</strong><small>Ưu tiên lựa chọn, tự chuyển bản thường nếu không có</small></span><select class="sp-select" id="sp-full-video-preference"><option value="censored">Mặc định có che (Censored)</option><option value="uncensored">Ưu tiên không che (Uncensored)</option><option value="subtitle">Ưu tiên phụ đề</option></select></label></div></div><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Phát chuyển tiếp trailer</strong><small>Dùng máy chủ trung chuyển để phát trailer</small></span><span class="sp-toggle"><input id="sp-trailer-proxy-playback" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Trailer HD</strong><small>Phát tối đa 4K, khi tắt tối đa 720P</small></span><span class="sp-toggle"><input id="sp-trailer-multi-quality" type="checkbox"><span class="sp-toggle-track"></span></span></label><div class="sp-order-block"><div class="sp-setting-copy"><strong>Thứ tự nguồn ảnh xem trước</strong><small>Dùng nút mũi tên để điều chỉnh ưu tiên</small></div><div class="sp-order-list" id="sp-thumb-order"></div></div></div></section><section class="sp-section" data-sp-panel="sites" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Trang web & Nút</div></div><div class="sp-settings-grid sp-button-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cổng tìm kiếm mặc định</strong><small>Trang tìm kiếm dùng khi mở menu chuyển hướng</small></span><select class="sp-select" id="sp-jump-engine"></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cổng video mặc định</strong><small>Trang web mở mặc định của nút video</small></span><select class="sp-select" id="sp-video-engine"></select></label><div class="sp-subsection-title">Bật/Tắt nút chuyển trang</div> ${renderButtonToggles()} </div></section><section class="sp-section" data-sp-panel="advanced" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Bộ nhớ đệm & Nâng cao</div></div><div class="sp-settings-grid"> ${renderCacheControls()} </div></section></div></div></div><div class="sp-footer"><div class="sp-footer-links"><a class="sp-footer-link" href="https://t.me/+cE2dFwl5DFM5YTBl" target="_blank" rel="noopener noreferrer">Nhóm TG</a><span class="sp-footer-sep"></span><a class="sp-footer-link" href="https://github.com/ZiPenOk/scripts" target="_blank" rel="noopener noreferrer">Github</a><span class="sp-footer-sep"></span><a class="sp-footer-link" href="https://sleazyfork.org/zh-CN/scripts/576375-jav%E8%80%81%E5%8F%B8%E6%9C%BA-%E6%96%B0/feedback" target="_blank" rel="noopener noreferrer">Phản hồi</a><span class="sp-footer-sep"></span><span class="sp-footer-link" style="cursor:default;color:#94a3b8;">v${SCRIPT_VERSION}</span></div><button class="sp-btn sp-btn-cancel" type="button">Hủy</button><button class="sp-btn sp-btn-save" type="button">Lưu cài đặt</button></div>`;
+   panel.innerHTML =`<div class="sp-header"><div><div class="sp-title">Cài đặt JAV Lái Xe</div></div><button class="sp-close" type="button" title="Đóng">×</button></div><div class="sp-body"><div class="sp-layout"><nav class="sp-nav" aria-label="Danh mục cài đặt" role="tablist">${renderSectionNav()}</nav><div class="sp-content"><section class="sp-section is-active" data-sp-panel="common" role="tabpanel"><div class="sp-section-head"><div class="sp-section-title">Phổ biến</div></div><div class="sp-settings-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Phím tắt trang chủ</strong><small>Hiện các thao tác nhanh trên thẻ danh sách</small></span><span class="sp-toggle"><input id="sp-list-preview" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Dịch tiêu đề</strong><small>Chọn dịch tiêu đề danh sách, chi tiết hoặc tất cả</small></span><select class="sp-select" id="sp-title-translate"><option value="list">Danh sách</option><option value="detail">Chi tiết</option><option value="all">Tất cả</option><option value="off">Tắt</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ngôn ngữ dịch tiêu đề</strong><small>Chọn ngôn ngữ muốn dịch sang</small></span><select class="sp-select" id="sp-title-translate-lang"><option value="vi">Tiếng Việt</option><option value="en">English</option><option value="zh-CN">Tiếng Trung (Giản thể)</option><option value="zh-TW">Tiếng Trung (Phồn thể)</option></select></label><label class="sp-setting-row" style="display:none;"><span class="sp-setting-copy"><strong>Dịch tiêu đề danh sách thẻ</strong></span><span class="sp-toggle"><input id="sp-title-translate-list" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Mở trang trong tab mới</strong><small>Mở liên kết danh sách trong tab mới</small></span><span class="sp-toggle"><input id="sp-list-new-tab" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Chế độ thẻ dọc</strong><small>Dùng thẻ dọc tối ưu hơn cho ảnh bìa</small></span><span class="sp-toggle"><input id="sp-portrait-cards" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Hiệu ứng nổi thẻ</strong><small>Thu phóng ảnh bìa luôn bật, không bị ảnh hưởng</small></span><span class="sp-toggle"><input id="sp-card-fx" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Xem trước ảnh bìa lớn</strong><small>Rê chuột để xem trước ảnh bìa HD</small></span><span class="sp-toggle"><input id="sp-cover-hover-preview" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Hiện trực tiếp ảnh xem trước</strong><small>Mở rộng trực tiếp ảnh xem trước ở trang chi tiết</small></span><span class="sp-toggle"><input id="sp-detail-preview" type="checkbox"><span class="sp-toggle-track"></span></span></label></div></section><section class="sp-section" data-sp-panel="layout" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Giao diện</div></div><div class="sp-settings-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>JavDB sắp xếp theo ngày phát hành</strong><small>Mặc định sắp xếp danh sách theo ngày phát hành</small></span><span class="sp-toggle"><input id="sp-javdb-release-sort" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Mặc định mở đánh giá</strong><small>Mở danh sách đánh giá ngắn khi vào trang chi tiết</small></span><span class="sp-toggle"><input id="sp-reviews-expanded" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cỡ chữ đánh giá</strong><small>Chỉnh kích thước chữ khu vực đánh giá</small></span><select class="sp-select" id="sp-review-font"><option value="small">Nhỏ</option><option value="medium">Vừa</option><option value="large">Lớn</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Tab mặc định chi tiết JavDB</strong><small>Nội dung ưu tiên hiển thị khi mở trang chi tiết</small></span><select class="sp-select" id="sp-api-tab"><option value="reviews">Đánh giá</option><option value="magnets">Magnet</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Đánh dấu diễn viên yêu thích</strong><small>Làm nổi bật diễn viên đã lưu trên trang tác phẩm</small></span><span class="sp-toggle"><input id="sp-actor-highlight" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Thông tin diễn viên</strong><small>Hiển thị thông tin diễn viên trên trang chi tiết tác phẩm</small></span><span class="sp-toggle"><input id="sp-actor-info" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ảnh bìa JavDB không watermark</strong><small>Thay thế bằng ảnh bìa không watermark từ JavDB APP CDN</small></span><span class="sp-toggle"><input id="sp-javdb-app-cover" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Khôi phục cuộn vô tận</strong><small>Khôi phục nội dung đã tải khi tải lại hoặc quay lại</small></span><span class="sp-toggle"><input id="sp-infinite-scroll-restore" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Cuộn vô tận (Waterfall)</strong><small>Tự động tải thêm khi cuộn xuống cuối danh sách</small></span><span class="sp-toggle"><input id="sp-infinite-scroll" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Hiển thị tìm kiếm tổng hợp</strong><small>Cách hiển thị khu vực magnet ở trang chi tiết</small></span><select class="sp-select" id="sp-magnet-display"><option value="sidebar">Bảng magnet độc lập</option><option value="native-replace">Tăng cường trang gốc</option><option value="native">Tắt</option></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Tab mặc định trang gốc</strong><small>Ưu tiên hiển thị khi dùng tăng cường trang gốc</small></span><select class="sp-select" id="sp-native-magnet-tab"><option value="native">Trang gốc</option><option value="aggregate">Kết quả tổng hợp</option></select></label></div></section><section class="sp-section" data-sp-panel="search" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Tìm kiếm & Phát</div></div><div class="sp-settings-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Công cụ magnet mặc định</strong><small>Công cụ mặc định dùng cho tìm kiếm tổng hợp</small></span><select class="sp-select" id="sp-default-engine"></select></label><div class="sp-setting-row sp-engine-editor"><span class="sp-setting-copy"><strong>Tên miền công cụ magnet</strong><small>Chọn công cụ và sửa đổi tên miền</small></span><div class="sp-engine-controls"><select class="sp-select" id="sp-engine-picker"></select><input class="sp-input" id="sp-engine-domain"></div></div><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Sắp xếp magnet</strong><small>Cách sắp xếp mặc định của danh sách magnet</small></span><select class="sp-select" id="sp-magnet-sort"><option value="size">Dung lượng</option><option value="newest">Mới nhất</option><option value="oldest">Cũ nhất</option></select></label><div class="sp-subsection-title">Phát phim đầy đủ</div><div class="sp-full-video-block"><div class="sp-full-video-controls"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Bật phát phim</strong><small>Tải trình phát phim đầy đủ trên ảnh bìa chi tiết</small></span><span class="sp-toggle"><input id="sp-full-video-playback" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Phiên bản ưu tiên</strong><small>Ưu tiên lựa chọn, tự chuyển bản thường nếu không có</small></span><select class="sp-select" id="sp-full-video-preference"><option value="censored">Mặc định có che (Censored)</option><option value="uncensored">Ưu tiên không che (Uncensored)</option><option value="subtitle">Ưu tiên phụ đề</option></select></label></div></div><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Phát chuyển tiếp trailer</strong><small>Dùng máy chủ trung chuyển để phát trailer</small></span><span class="sp-toggle"><input id="sp-trailer-proxy-playback" type="checkbox"><span class="sp-toggle-track"></span></span></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Trailer HD</strong><small>Phát tối đa 4K, khi tắt tối đa 720P</small></span><span class="sp-toggle"><input id="sp-trailer-multi-quality" type="checkbox"><span class="sp-toggle-track"></span></span></label><div class="sp-order-block"><div class="sp-setting-copy"><strong>Thứ tự nguồn ảnh xem trước</strong><small>Dùng nút mũi tên để điều chỉnh ưu tiên</small></div><div class="sp-order-list" id="sp-thumb-order"></div></div></div></section><section class="sp-section" data-sp-panel="sites" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Trang web & Nút</div></div><div class="sp-settings-grid sp-button-grid"><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ưu tiên 3 trang lớn</strong><small>Trang mặc định mở trên trang chi tiết</small></span><select class="sp-select" id="sp-three-site-engine"></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ưu tiên tìm magnet</strong><small>Trang tìm kiếm magnet mặc định</small></span><select class="sp-select" id="sp-magnet-search-engine"></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ưu tiên CSDL</strong><small>Trang tra cứu thông tin phim mặc định</small></span><select class="sp-select" id="sp-database-engine"></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ưu tiên CSDL FC2</strong><small>Trang tra cứu mã FC2 mặc định</small></span><select class="sp-select" id="sp-database-fc2-engine"></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ưu tiên tìm kiếm ngoài</strong><small>Công cụ tìm kiếm ngoài mặc định</small></span><select class="sp-select" id="sp-jump-engine"></select></label><label class="sp-setting-row"><span class="sp-setting-copy"><strong>Ưu tiên trang xem video</strong><small>Trang web mở mặc định của nút video</small></span><select class="sp-select" id="sp-video-engine"></select></label><div class="sp-subsection-title">Lưu kho Amane</div><div class="sp-setting-row sp-guide-link" id="sp-open-amane-settings" style="grid-column:1 / -1;cursor:pointer;"><span class="sp-setting-copy"><strong>Cài đặt lưu kho Amane</strong><small>Mở hộp thoại cấu hình Amane (URL máy chủ, Token tích hợp javxy, chọn thư viện lưu trữ)</small></span><button class="sp-btn" type="button" style="justify-self:end;background:#2563eb;color:#fff;">Cấu hình</button></div><div class="sp-subsection-title">Bật/Tắt nút chuyển trang</div> ${renderButtonToggles()} </div></section><section class="sp-section" data-sp-panel="advanced" role="tabpanel" hidden><div class="sp-section-head"><div class="sp-section-title">Bộ nhớ đệm & Nâng cao</div></div><div class="sp-settings-grid"> ${renderCacheControls()} </div></section></div></div></div><div class="sp-footer"><div class="sp-footer-links"><a class="sp-footer-link" href="https://t.me/+cE2dFwl5DFM5YTBl" target="_blank" rel="noopener noreferrer">Nhóm TG</a><span class="sp-footer-sep"></span><a class="sp-footer-link" href="https://github.com/ZiPenOk/scripts" target="_blank" rel="noopener noreferrer">Github</a><span class="sp-footer-sep"></span><a class="sp-footer-link" href="https://sleazyfork.org/zh-CN/scripts/576375-jav%E8%80%81%E5%8F%B8%E6%9C%BA-%E6%96%B0/feedback" target="_blank" rel="noopener noreferrer">Phản hồi</a><span class="sp-footer-sep"></span><span class="sp-footer-link" style="cursor:default;color:#94a3b8;">v${SCRIPT_VERSION}</span></div><button class="sp-btn sp-btn-cancel" type="button">Hủy</button><button class="sp-btn sp-btn-save" type="button">Lưu cài đặt</button></div>`;
    overlay.appendChild(panel); document.body.appendChild(overlay); const navItems = [...panel.querySelectorAll('[data-sp-section]')]; const sectionPanels = [...panel.querySelectorAll('[data-sp-panel]')];
    navItems.forEach(item => item.addEventListener('click', () => {
     const section = item.dataset.spSection;
     navItems.forEach(nav => { const active = nav === item; nav.classList.toggle('is-active', active); nav.setAttribute('aria-selected', active ? 'true' : 'false'); });
     sectionPanels.forEach(panelSection => { const active = panelSection.dataset.spPanel === section; panelSection.classList.toggle('is-active', active); panelSection.hidden = !active; });
    }));
-   const defaultSelect = panel.querySelector('#sp-default-engine'); const picker = panel.querySelector('#sp-engine-picker'); const domainInput = panel.querySelector('#sp-engine-domain'); const jumpEngineSelect = panel.querySelector('#sp-jump-engine');
-   const videoEngineSelect = panel.querySelector('#sp-video-engine'); const magnetDisplaySelect = panel.querySelector('#sp-magnet-display'); const pan115PlayerSelect = panel.querySelector('#sp-pan115-player');
+   const defaultSelect = panel.querySelector('#sp-default-engine'); const picker = panel.querySelector('#sp-engine-picker'); const domainInput = panel.querySelector('#sp-engine-domain');
+   const threeSiteSelect = panel.querySelector('#sp-three-site-engine'); const magnetSearchSelect = panel.querySelector('#sp-magnet-search-engine');
+   const databaseSelect = panel.querySelector('#sp-database-engine'); const databaseFc2Select = panel.querySelector('#sp-database-fc2-engine');
+   const jumpEngineSelect = panel.querySelector('#sp-jump-engine'); const videoEngineSelect = panel.querySelector('#sp-video-engine');
+   const magnetDisplaySelect = panel.querySelector('#sp-magnet-display'); const pan115PlayerSelect = panel.querySelector('#sp-pan115-player');
    const fullVideoPlaybackCheckbox = panel.querySelector('#sp-full-video-playback'); const fullVideoPreferenceSelect = panel.querySelector('#sp-full-video-preference'); const trailerProxyPlaybackCheckbox = panel.querySelector('#sp-trailer-proxy-playback');
    const trailerMultiQualityCheckbox = panel.querySelector('#sp-trailer-multi-quality'); const infiniteScrollRestoreCheckbox = panel.querySelector('#sp-infinite-scroll-restore'); const infiniteScrollCheckbox = panel.querySelector('#sp-infinite-scroll');
    const listPreviewCheckbox = panel.querySelector('#sp-list-preview'); const javdbReleaseSortCheckbox = panel.querySelector('#sp-javdb-release-sort'); const titleTranslateSelect = panel.querySelector('#sp-title-translate'); const titleTranslateLangSelect = panel.querySelector('#sp-title-translate-lang'); const titleTranslateListCheckbox = panel.querySelector('#sp-title-translate-list');
@@ -3969,9 +4004,22 @@
    domainInput.addEventListener('input', () => {
     domainDraft[picker.value] = stripProtocol(domainInput.value); syncDefaultOptions();
    });
-   JUMP_SEARCH_ENGINES.forEach((name, index) => { jumpEngineSelect.add(new Option(name, String(index))); });
-   VIDEO_ENGINES.forEach(item => { videoEngineSelect.add(new Option(item.label, item.key)); });
-   jumpEngineSelect.value = String(readStoredValue('default_search_engine', JUMP_SEARCH_ENGINES.length - 1)); Ui.setSelectValue(videoEngineSelect, CFG.defaultVideoEngine, 'missav');
+   THREE_SITES_OPTIONS.forEach(item => { threeSiteSelect?.add(new Option(item.label, item.key)); });
+   MAGNET_SEARCH_OPTIONS.forEach(item => { magnetSearchSelect?.add(new Option(item.label, item.key)); });
+   DATABASE_OPTIONS.forEach(item => { databaseSelect?.add(new Option(item.label, item.key)); });
+   DATABASE_FC2_OPTIONS.forEach(item => { databaseFc2Select?.add(new Option(item.label, item.key)); });
+   SEARCH_ENGINES_OPTIONS.forEach(item => { jumpEngineSelect?.add(new Option(item.label, item.key)); });
+   VIDEO_ENGINES.forEach(item => { videoEngineSelect?.add(new Option(item.label, item.key)); });
+   Ui.setSelectValue(threeSiteSelect, CFG.jumpPreferredThreeSite, 'javbus');
+   Ui.setSelectValue(magnetSearchSelect, CFG.jumpPreferredMagnet, 'sukebei');
+   Ui.setSelectValue(databaseSelect, CFG.jumpPreferredDatabase, 'avbase');
+   Ui.setSelectValue(databaseFc2Select, CFG.jumpPreferredDatabaseFc2, 'fd2ppv');
+   Ui.setSelectValue(jumpEngineSelect, CFG.jumpPreferredSearch, 'duckgo');
+   Ui.setSelectValue(videoEngineSelect, CFG.defaultVideoEngine, 'missav');
+   panel.querySelector('#sp-open-amane-settings')?.addEventListener('click', e => {
+    e.preventDefault();
+    if (typeof AmaneSettings !== 'undefined' && AmaneSettings?.open) AmaneSettings.open();
+   });
    if (pan115PlayerSelect) {
     pan115PlayerSelect.value = ['official', '115master', 'potplayer'].includes(CFG.pan115Player) ? CFG.pan115Player : 'official'; }
    fullVideoPlaybackCheckbox.checked = CFG.fullVideoPlayback; fullVideoPreferenceSelect.value = CFG.fullVideoPreference;
@@ -4077,7 +4125,14 @@
     });
     const beforeNonPan115 = snapshotNonPan115(); const beforePan115Player = CFG.pan115Player; const nextPan115Player = ['official', '115master', 'potplayer'].includes(pan115PlayerSelect?.value) ? pan115PlayerSelect.value : 'official';
     MAGNET_ENGINES.forEach(item => { CFG[item.key] = stripProtocol(domainDraft[item.key]); });
-    CFG.defaultEngine = defaultSelect.value; writeStoredValue('default_search_engine', parseInt(jumpEngineSelect.value, 10) || 0); CFG.defaultVideoEngine = videoEngineSelect.value || 'missav'; CFG.pan115Player = nextPan115Player;
+    CFG.defaultEngine = defaultSelect.value;
+    CFG.jumpPreferredThreeSite = threeSiteSelect?.value || 'javbus';
+    CFG.jumpPreferredMagnet = magnetSearchSelect?.value || 'sukebei';
+    CFG.jumpPreferredDatabase = databaseSelect?.value || 'avbase';
+    CFG.jumpPreferredDatabaseFc2 = databaseFc2Select?.value || 'fd2ppv';
+    CFG.jumpPreferredSearch = jumpEngineSelect?.value || 'duckgo';
+    CFG.defaultVideoEngine = videoEngineSelect?.value || 'missav';
+    CFG.pan115Player = nextPan115Player;
     CFG.trailerProxyPlayback = !!trailerProxyPlaybackCheckbox?.checked; CFG.trailerMultiQuality = !!trailerMultiQualityCheckbox?.checked; CFG.fullVideoPlayback = fullVideoPlaybackCheckbox.checked; CFG.fullVideoPreference = fullVideoPreferenceSelect.value;
     CFG.listPreviewQuick = !!listPreviewCheckbox?.checked; CFG.javdbReleaseSort = !!javdbReleaseSortCheckbox?.checked; CFG.titleTranslate = titleTranslateSelect?.value || 'detail'; CFG.titleTranslateTargetLang = titleTranslateLangSelect?.value || 'vi'; CFG.titleTranslateList = !!titleTranslateListCheckbox?.checked; CFG.listOpenNewTab = !!listNewTabCheckbox?.checked;
     CFG.portraitCards = !!portraitCardsCheckbox?.checked; CFG.cardFx = !!cardFxCheckbox?.checked; CFG.coverHoverPreview = !!coverHoverPreviewCheckbox?.checked; CFG.detailPreviewInline = !!detailPreviewCheckbox?.checked;
@@ -4344,10 +4399,854 @@
   sync() {},
  };
  Core.expose('__LAOSIJI_PAN115_SETTINGS_ENTRY__', Pan115SettingsEntry);
+
+// ==========================================
+// Amane Ingestion Module
+// ==========================================
+const AmaneConfig = (() => {
+  const KEYS = {
+    baseUrl: "amane_base_url",
+    token: "amane_javxy_token",
+    libraryId: "amane_library_id",
+    libraryName: "amane_library_name",
+    askLibraryEachPush: "amane_ask_library_each_push_v2",
+    pushEnabled: "amane_push_enabled",
+  };
+  const DEFAULTS = {
+    baseUrl: "http://127.0.0.1:8000",
+    token: "",
+    libraryId: 0,
+    libraryName: "",
+    askLibraryEachPush: true,
+    pushEnabled: true,
+  };
+
+  function read(prop, defVal) {
+    if (typeof readStoredValue === "function") {
+      const val = readStoredValue(KEYS[prop], defVal);
+      return val ?? defVal;
+    }
+    return defVal;
+  }
+
+  function write(prop, val) {
+    if (typeof writeStoredValue === "function") {
+      writeStoredValue(KEYS[prop], val);
+    }
+  }
+
+  function normalizeBaseUrl(url) {
+    let u = String(url || "").trim();
+    if (!u) return DEFAULTS.baseUrl;
+    if (!/^https?:\/\//i.test(u)) u = "http://" + u;
+    return u.replace(/\/+$/, "");
+  }
+
+  return {
+    normalizeBaseUrl,
+    get baseUrl() { return normalizeBaseUrl(read("baseUrl", DEFAULTS.baseUrl)); },
+    set baseUrl(v) { write("baseUrl", normalizeBaseUrl(v)); },
+    get token() { return String(read("token", DEFAULTS.token) || "").trim(); },
+    set token(v) { write("token", String(v || "").trim()); },
+    get libraryId() {
+      const p = Number(read("libraryId", DEFAULTS.libraryId));
+      return Number.isFinite(p) && p > 0 ? Math.trunc(p) : 0;
+    },
+    set libraryId(v) { write("libraryId", Math.max(0, Math.trunc(Number(v) || 0))); },
+    get libraryName() { return String(read("libraryName", DEFAULTS.libraryName) || "").trim(); },
+    set libraryName(v) { write("libraryName", String(v || "").trim()); },
+    get askLibraryEachPush() { return !!read("askLibraryEachPush", DEFAULTS.askLibraryEachPush); },
+    set askLibraryEachPush(v) { write("askLibraryEachPush", !!v); },
+    get pushEnabled() { return !!read("pushEnabled", DEFAULTS.pushEnabled); },
+    set pushEnabled(v) { write("pushEnabled", !!v); },
+  };
+})();
+
+const AmaneApi = (() => {
+  class AmApiError extends Error {
+    constructor(msg, status = 0, payload = null) {
+      super(msg);
+      this.name = "AmApiError";
+      this.status = status;
+      this.payload = payload;
+    }
+  }
+
+  function readJson(text) {
+    if (!text) return null;
+    try { return JSON.parse(text); } catch { return null; }
+  }
+
+  function formatDetailPart(part) {
+    if (part == null) return "";
+    if (typeof part === "string") return part.trim();
+    if (typeof part !== "object") return String(part);
+    const msg = part.msg ?? part.message ?? part.error ?? part.reason;
+    if (msg !== undefined) {
+      const formattedMsg = formatDetailPart(msg);
+      const loc = Array.isArray(part.loc) ? part.loc.filter(x => x != null && x !== "").join(".") : "";
+      return loc && formattedMsg ? loc + ": " + formattedMsg : formattedMsg;
+    }
+    if (part.detail !== undefined) return formatDetailPart(part.detail);
+    try {
+      const str = JSON.stringify(part);
+      return str && str !== "{}" ? str : "";
+    } catch { return ""; }
+  }
+
+  function formatErrorDetail(detail, fallback = "Yêu cầu mạng thất bại") {
+    if (Array.isArray(detail)) {
+      const parts = detail.map(formatDetailPart).filter(Boolean);
+      if (parts.length) return parts.join("; ");
+    } else {
+      const single = formatDetailPart(detail);
+      if (single) return single;
+    }
+    return String(fallback || "Yêu cầu mạng thất bại");
+  }
+
+  async function request(method, path, options = {}) {
+    const baseUrl = AmaneConfig.normalizeBaseUrl(options.baseUrl || AmaneConfig.baseUrl);
+    const token = options.token === undefined ? AmaneConfig.token : String(options.token || "").trim();
+    const headers = {
+      Accept: "application/json",
+      ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: "Bearer " + token } : {}),
+    };
+    const res = await Core.gmFetch(baseUrl + "/api/integrations/javxy" + path, {
+      method,
+      headers,
+      data: options.body === undefined ? undefined : JSON.stringify(options.body),
+      timeout: options.timeout || 30000,
+    });
+    const text = String(res?.responseText || "").trim();
+    const json = readJson(text);
+    if (!res || !res.ok) {
+      const status = Number(res?.status) || 0;
+      const kind = res?.error?.kind;
+      const detail = json?.detail ?? json?.msg ?? json?.message ?? json?.error ?? (json ? "" : text) ?? kind;
+      throw new AmApiError(formatErrorDetail(detail, kind || "Yêu cầu mạng thất bại"), status, json);
+    }
+    return json;
+  }
+
+  return {
+    AmApiError,
+    normalizeBaseUrl: AmaneConfig.normalizeBaseUrl,
+    capabilities: (opts = {}) => request("GET", "/capabilities", opts),
+    createImport: (body, opts = {}) => request("POST", "/imports", { ...opts, body }),
+    getSubmission: (id, opts = {}) => request("GET", "/imports/" + encodeURIComponent(String(id)) + "/submission", opts),
+  };
+})();
+
+const AmanePanel = (() => {
+  const PANEL_ID = "jav-amane-import-panel";
+  const STYLE_ID = "jav-amane-import-panel-style";
+  let tasks = [];
+  const dismissTimers = new Map();
+  const SUCCESS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+  const ERROR_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/></svg>';
+  const INFO_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.5h.01"/></svg>';
+
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+#${PANEL_ID}{position:fixed;left:20px;bottom:20px;z-index:2147483002;display:flex;flex-direction:column;gap:10px;width:min(390px,calc(100vw - 32px));max-height:min(72vh,560px);overflow-y:auto;pointer-events:none;font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;color-scheme:dark}
+#${PANEL_ID}::-webkit-scrollbar{display:none}
+#${PANEL_ID} .am-card{--accent:#60a5fa;--accent-soft:rgba(96,165,250,.14);--accent-text:#bfdbfe;position:relative;pointer-events:auto;display:grid;grid-template-columns:38px minmax(0,1fr);gap:11px;padding:13px 38px 13px 14px;background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(15,23,42,.98));border:1px solid rgba(148,163,184,.2);border-radius:14px;box-shadow:0 18px 44px rgba(2,6,23,.45),inset 0 1px 0 rgba(255,255,255,.04);overflow:hidden;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+#${PANEL_ID} .am-card::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--accent)}
+#${PANEL_ID} .am-card[data-kind="success"]{--accent:#34d399;--accent-soft:rgba(52,211,153,.14);--accent-text:#a7f3d0}
+#${PANEL_ID} .am-card[data-kind="error"]{--accent:#fb7185;--accent-soft:rgba(251,113,133,.14);--accent-text:#fecdd3}
+#${PANEL_ID} .am-card[data-kind="warning"]{--accent:#fbbf24;--accent-soft:rgba(251,191,36,.14);--accent-text:#fde68a}
+#${PANEL_ID} .am-card[data-kind="info"]{--accent:#60a5fa;--accent-soft:rgba(96,165,250,.14);--accent-text:#bfdbfe}
+#${PANEL_ID} .am-card.am-enter{animation:am-card-in .34s cubic-bezier(.22,.9,.3,1.2) both}
+#${PANEL_ID} .am-card.am-update{animation:am-card-flash .38s ease both}
+#${PANEL_ID} .am-icon{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;align-self:start;background:var(--accent-soft);color:var(--accent-text)}
+#${PANEL_ID} .am-icon svg{width:19px;height:19px;display:block}
+#${PANEL_ID} .am-spinner{width:17px;height:17px;border-radius:50%;border:2px solid rgba(147,197,253,.22);border-top-color:var(--accent);animation:am-spin .8s linear infinite}
+#${PANEL_ID} .am-main{min-width:0}
+#${PANEL_ID} .am-top{display:flex;align-items:center;gap:8px;min-width:0}
+#${PANEL_ID} .am-code{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 14px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.01em;color:#f1f5f9}
+#${PANEL_ID} .am-pill{flex:none;margin-left:auto;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent-text);font-size:10.5px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+#${PANEL_ID} .am-status{margin:3px 0 0;color:#a8b6cc;font-size:12.5px;line-height:1.55;word-break:break-word}
+#${PANEL_ID} .am-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:9px}
+#${PANEL_ID} .am-chip{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 7px;border-radius:6px;background:rgba(148,163,184,.12);color:#cbd5e1;font-size:10.5px}
+#${PANEL_ID} .am-chip-task{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+#${PANEL_ID} .am-open{display:inline-flex;align-items:center;gap:3px;margin-left:auto;padding:2px 0;color:var(--accent-text);font-size:11px;font-weight:600;text-decoration:none}
+#${PANEL_ID} .am-open:hover{color:#fff;text-decoration:underline}
+#${PANEL_ID} .am-dismiss{position:absolute;top:8px;right:8px;width:22px;height:22px;padding:0;border:0;border-radius:6px;background:transparent;color:#7f8ea5;font:16px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer;opacity:0;transition:opacity .18s ease,background .18s ease,color .18s ease}
+#${PANEL_ID} .am-card:hover .am-dismiss,#${PANEL_ID} .am-dismiss:focus-visible{opacity:1}
+#${PANEL_ID} .am-dismiss:hover{background:rgba(148,163,184,.14);color:#e2e8f0}
+#${PANEL_ID} .am-actions{display:flex;gap:6px;margin-top:9px}
+#${PANEL_ID} .am-actions button{border:1px solid rgba(148,163,184,.32);background:rgba(30,41,59,.9);color:#dbe5f3;border-radius:7px;padding:4px 10px;font-size:11px;cursor:pointer}
+#${PANEL_ID} .am-actions button:hover:not([disabled]){border-color:var(--accent);color:#fff}
+#${PANEL_ID} .am-actions button[disabled]{opacity:.45;cursor:default}
+@keyframes am-card-in{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes am-card-flash{0%{border-color:var(--accent)}100%{border-color:rgba(148,163,184,.2)}}
+@keyframes am-spin{to{transform:rotate(360deg)}}
+@media (hover:none){#${PANEL_ID} .am-dismiss{opacity:.7}}
+@media (max-width:480px){#${PANEL_ID}{left:12px;right:12px;bottom:12px;width:auto;max-height:64vh}}
+@media (prefers-reduced-motion:reduce){#${PANEL_ID} .am-card,#${PANEL_ID} .am-card.am-enter,#${PANEL_ID} .am-card.am-update,#${PANEL_ID} .am-spinner{animation:none!important;transition:none!important}}
+`;
+    document.head.appendChild(style);
+  }
+
+  function root() { return document.getElementById(PANEL_ID); }
+
+  function open() {
+    ensureStyle();
+    if (root() || !document.body) return;
+    const sec = document.createElement("section");
+    sec.id = PANEL_ID;
+    sec.setAttribute("role", "region");
+    sec.setAttribute("aria-label", "Thông báo lưu kho Amane");
+    sec.setAttribute("aria-live", "polite");
+    document.body.appendChild(sec);
+  }
+
+  function close() {
+    dismissTimers.forEach(t => clearTimeout(t));
+    dismissTimers.clear();
+    tasks = [];
+    root()?.remove();
+  }
+
+  function addTask(opts = {}) {
+    const task = Object.assign({
+      id: "am" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      code: "",
+      state: "",
+      status: "",
+      statusKind: "info",
+      taskId: null,
+      libraryName: "",
+      href: "",
+      failed: false,
+      settled: false,
+      busy: false,
+      hold: false,
+      canRetry: false,
+      canCancel: false,
+      onRetry: null,
+      onCancel: null,
+    }, opts);
+    tasks.push(task);
+    while (tasks.length > 4) {
+      const old = tasks.shift();
+      const tm = dismissTimers.get(old.id);
+      if (tm) { clearTimeout(tm); dismissTimers.delete(old.id); }
+    }
+    open();
+    render();
+    return task;
+  }
+
+  function updateTask(task, patch = {}) {
+    if (!task) return;
+    Object.assign(task, patch);
+    task.changed = true;
+    render();
+  }
+
+  function pauseDismiss(task) {
+    const tm = dismissTimers.get(task.id);
+    if (tm) { clearTimeout(tm); dismissTimers.delete(task.id); }
+  }
+
+  function scheduleDismiss(task) {
+    pauseDismiss(task);
+    const tm = setTimeout(() => dismiss(task), 5000);
+    dismissTimers.set(task.id, tm);
+  }
+
+  function dismiss(task) {
+    pauseDismiss(task);
+    tasks = tasks.filter(t => t !== task);
+    render();
+    if (!tasks.length) close();
+  }
+
+  function finishTask(task, patch = {}) {
+    if (!task) return;
+    Object.assign(task, patch, { settled: true, busy: false, canRetry: false, canCancel: false });
+    if (patch.hold !== undefined) task.hold = !!patch.hold;
+    task.changed = true;
+    render();
+    if (!task.failed && !task.hold) scheduleDismiss(task);
+  }
+
+  function kindOf(task) {
+    if (task.failed || task.statusKind === "error") return "error";
+    if (task.statusKind === "warning") return "warning";
+    if (task.statusKind === "success") return "success";
+    return "info";
+  }
+
+  function renderTask(task) {
+    const kind = kindOf(task);
+    const card = document.createElement("article");
+    card.className = "am-card";
+    card.dataset.kind = kind;
+    card.dataset.taskId = String(task.id);
+
+    const iconDiv = document.createElement("div");
+    iconDiv.className = "am-icon";
+    if (task.settled) {
+      iconDiv.innerHTML = kind === "error" ? ERROR_ICON : kind === "success" ? SUCCESS_ICON : INFO_ICON;
+    } else {
+      const spinner = document.createElement("span");
+      spinner.className = "am-spinner";
+      iconDiv.appendChild(spinner);
+    }
+    card.appendChild(iconDiv);
+
+    const mainDiv = document.createElement("div");
+    mainDiv.className = "am-main";
+
+    const topDiv = document.createElement("div");
+    topDiv.className = "am-top";
+
+    const codeSpan = document.createElement("span");
+    codeSpan.className = "am-code";
+    codeSpan.textContent = task.code || "Tác vụ Amane";
+    topDiv.appendChild(codeSpan);
+
+    if (task.state) {
+      const pill = document.createElement("span");
+      pill.className = "am-pill";
+      pill.textContent = task.state;
+      topDiv.appendChild(pill);
+    }
+    mainDiv.appendChild(topDiv);
+
+    if (task.status) {
+      const p = document.createElement("p");
+      p.className = "am-status";
+      p.textContent = task.status;
+      mainDiv.appendChild(p);
+    }
+
+    const metaItems = [];
+    if (task.libraryName) {
+      const chip = document.createElement("span");
+      chip.className = "am-chip";
+      chip.textContent = task.libraryName;
+      metaItems.push(chip);
+    }
+    if (task.taskId !== null && task.taskId !== undefined && task.taskId !== "") {
+      const chip = document.createElement("span");
+      chip.className = "am-chip am-chip-task";
+      chip.textContent = "Tác vụ #" + task.taskId;
+      metaItems.push(chip);
+    }
+    if (task.href && /^https?:\/\//i.test(task.href)) {
+      const link = document.createElement("a");
+      link.className = "am-open";
+      link.href = task.href;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "Mở Amane";
+      const arr = document.createElement("span");
+      arr.setAttribute("aria-hidden", "true");
+      arr.textContent = " ↗";
+      link.appendChild(arr);
+      metaItems.push(link);
+    }
+    if (metaItems.length) {
+      const metaDiv = document.createElement("div");
+      metaDiv.className = "am-meta";
+      metaItems.forEach(item => metaDiv.appendChild(item));
+      mainDiv.appendChild(metaDiv);
+    }
+
+    if (task.canRetry || task.canCancel) {
+      const actDiv = document.createElement("div");
+      actDiv.className = "am-actions";
+      if (task.canRetry) {
+        const retryBtn = document.createElement("button");
+        retryBtn.type = "button";
+        retryBtn.textContent = "Thử lại";
+        retryBtn.disabled = !!task.busy;
+        retryBtn.addEventListener("click", () => {
+          if (task.busy || typeof task.onRetry !== "function") return;
+          task.busy = true;
+          task.changed = true;
+          render();
+          Promise.resolve(task.onRetry()).catch(() => {});
+        });
+        actDiv.appendChild(retryBtn);
+      }
+      if (task.canCancel) {
+        const cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.textContent = "Hủy";
+        cancelBtn.disabled = !!task.busy;
+        cancelBtn.addEventListener("click", () => {
+          if (task.busy || typeof task.onCancel !== "function") return;
+          task.busy = true;
+          task.changed = true;
+          render();
+          Promise.resolve(task.onCancel()).catch(() => {});
+        });
+        actDiv.appendChild(cancelBtn);
+      }
+      mainDiv.appendChild(actDiv);
+    }
+    card.appendChild(mainDiv);
+
+    const dismissBtn = document.createElement("button");
+    dismissBtn.type = "button";
+    dismissBtn.className = "am-dismiss";
+    dismissBtn.title = "Đóng";
+    dismissBtn.setAttribute("aria-label", "Đóng thông báo");
+    dismissBtn.textContent = "×";
+    dismissBtn.addEventListener("click", () => dismiss(task));
+    card.appendChild(dismissBtn);
+
+    card.addEventListener("mouseenter", () => pauseDismiss(task));
+    card.addEventListener("mouseleave", () => { if (task.settled && !task.failed) scheduleDismiss(task); });
+    card.addEventListener("focusin", () => pauseDismiss(task));
+    card.addEventListener("focusout", (e) => {
+      if (!card.contains(e.relatedTarget) && task.settled && !task.failed) scheduleDismiss(task);
+    });
+
+    return card;
+  }
+
+  function render() {
+    const r = root();
+    if (!r) return;
+    const existingIds = new Set(Array.from(r.querySelectorAll(".am-card"), el => el.dataset.taskId));
+    r.textContent = "";
+    tasks.forEach(t => {
+      const card = renderTask(t);
+      if (existingIds.has(String(t.id))) {
+        if (t.changed) card.classList.add("am-update");
+      } else {
+        card.classList.add("am-enter");
+      }
+      delete t.changed;
+      r.appendChild(card);
+    });
+  }
+
+  return { addTask, updateTask, finishTask, close, ensureStyle };
+})();
+
+const AmaneService = (() => {
+  function codeFromContext(url, ctx = {}) {
+    const rawCode = String(ctx.code || "").trim();
+    if (rawCode) return rawCode;
+    const titleCode = typeof Utils !== "undefined" && Utils.extractCode ? Utils.extractCode(String(ctx.title || "")) : "";
+    if (titleCode) return titleCode;
+    let s = String(url || "").replace(/urn:btih:[a-z0-9]+/gi, " ");
+    try { s = decodeURIComponent(s); } catch {}
+    return (typeof Utils !== "undefined" && Utils.extractCode && Utils.extractCode(s + " " + (document.title || ""))) || "";
+  }
+
+  function newRequestId() {
+    return "javxy-" + (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function" ? globalThis.crypto.randomUUID() : Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10));
+  }
+
+  async function resolveLibrary() {
+    if (!AmaneConfig.askLibraryEachPush && AmaneConfig.libraryId) {
+      return { id: AmaneConfig.libraryId, name: AmaneConfig.libraryName };
+    }
+    const caps = await AmaneApi.capabilities();
+    if (!caps?.available || !Array.isArray(caps.libraries) || !caps.libraries.length) {
+      throw new Error(caps?.reason || "Amane không có thư viện khả dụng");
+    }
+    const libs = caps.libraries;
+    if (libs.length === 1 && !AmaneConfig.askLibraryEachPush) {
+      const single = libs[0];
+      AmaneConfig.libraryId = single.id;
+      AmaneConfig.libraryName = single.name || "";
+      return single;
+    }
+    const chosen = await AmaneSettings.chooseLibrary(libs, AmaneConfig.libraryId, {
+      remember: !AmaneConfig.askLibraryEachPush,
+      title: AmaneConfig.askLibraryEachPush ? "Chọn thư viện Amane cho lần lưu này" : "Chọn thư viện Amane mặc định",
+    });
+    if (!chosen) throw new Error("Đã hủy chọn thư viện Amane");
+    return chosen;
+  }
+
+  const CONFIRM_INTERVALS = [1000, 2000, 3000, 3000, 3000];
+
+  function acceptedPatch(taskId, libraryName, href) {
+    return {
+      hold: false,
+      state: "Đã gửi",
+      status: "Amane đã tiếp nhận, đã vào quy trình lưu kho",
+      statusKind: "success",
+      taskId,
+      libraryName,
+      href,
+    };
+  }
+
+  function delay(ms) {
+    return new Promise(res => {
+      const tm = setTimeout(res, ms);
+      if (tm && typeof tm.unref === "function") tm.unref();
+    });
+  }
+
+  async function confirmSubmission(task, id, libraryName, href, intervals = CONFIRM_INTERVALS) {
+    if (!task || typeof AmaneApi.getSubmission !== "function") {
+      AmanePanel.finishTask(task, acceptedPatch(id, libraryName, href));
+      return;
+    }
+    for (const ms of intervals) {
+      await delay(ms);
+      let sub;
+      try {
+        sub = await AmaneApi.getSubmission(id);
+      } catch (err) {
+        const st = Number(err?.status) || 0;
+        if (st >= 400 && st < 500 && st !== 429) break;
+        continue;
+      }
+      const state = String(sub?.state || "");
+      if (state !== "pending") {
+        if (state === "reused") {
+          const code = String(task.code || "").trim();
+          const taskName = String(sub?.task_name || (code && code !== "Tác vụ Amane" ? code : "")).trim();
+          AmanePanel.finishTask(task, {
+            hold: false,
+            state: "Đã tái sử dụng",
+            status: taskName ? `Đã tồn tại ${taskName}, đã tái sử dụng` : "Tác vụ đã tồn tại trong kho, đã tái sử dụng",
+            statusKind: "warning",
+            taskId: id,
+            libraryName,
+            href,
+          });
+          return;
+        }
+        if (state === "submitted") {
+          AmanePanel.finishTask(task, {
+            ...acceptedPatch(id, libraryName, href),
+            status: "Đã gửi tác vụ tải về, Amane tiếp tục xử lý lưu kho",
+          });
+          return;
+        }
+        if (state === "error") {
+          AmanePanel.finishTask(task, {
+            hold: false,
+            failed: true,
+            state: "Thất bại",
+            status: sub.message || "Gửi tác vụ tải về thất bại",
+            statusKind: "error",
+            taskId: id,
+            libraryName,
+            href,
+          });
+          return;
+        }
+      }
+    }
+    AmanePanel.finishTask(task, acceptedPatch(id, libraryName, href));
+  }
+
+  async function start(magnetUrl, ctx = {}) {
+    const raw = String(magnetUrl || "").trim();
+    const isMag = /^magnet:\?/i.test(raw);
+    const isEd2k = /^ed2k:\/\//i.test(raw);
+    const isEd2kFile = /^ed2k:\/\/\|file\|/i.test(raw);
+    if (!isMag && !isEd2kFile) {
+      throw isEd2k
+        ? new Error("Định dạng liên kết ED2K không hợp lệ: Amane chỉ hỗ trợ ed2k://|file|")
+        : new Error("Lưu kho Amane chỉ hỗ trợ liên kết magnet hoặc ed2k://|file|");
+    }
+    const cleanUrl = /^ed2k:\/\/\|file\|/i.test(raw) && /\|$/.test(raw) ? raw + "/" : raw;
+    const code = codeFromContext(cleanUrl, ctx);
+    const task = AmanePanel.addTask({
+      code: code || "Tác vụ Amane",
+      state: "Đang gửi",
+      status: "Đang gửi tới Amane…",
+    });
+
+    try {
+      const lib = await resolveLibrary();
+      const libLabel = lib.name || "#" + lib.id;
+      AmanePanel.updateTask(task, {
+        libraryName: libLabel,
+        status: "Đang tạo tác vụ lưu kho Amane…",
+      });
+
+      const res = await AmaneApi.createImport({
+        request_id: newRequestId(),
+        library_id: lib.id,
+        download_url: cleanUrl,
+        code: code || null,
+        source: "javxy",
+      });
+      const importId = Number(res?.id);
+      if (!importId) throw new Error("Amane không trả về ID tác vụ lưu kho");
+
+      const base = typeof AmaneConfig.baseUrl === "string" ? AmaneConfig.baseUrl.replace(/\/+$/, "") : "";
+      const href = base ? base + "/amane?tab=acquisitions" : "";
+
+      AmanePanel.finishTask(task, { ...acceptedPatch(importId, libLabel, href), hold: true });
+      confirmSubmission(task, importId, libLabel, href);
+      return { ok: true, code, dir: "", message: "", infoHash: "" };
+    } catch (err) {
+      const msg = String(err?.message || err || "Gửi lưu kho thất bại");
+      const isCancelled = msg === "Đã hủy chọn thư viện Amane";
+      AmanePanel.finishTask(task, {
+        failed: !isCancelled,
+        state: isCancelled ? "Đã hủy" : "Thất bại",
+        status: isCancelled ? "Đã hủy chọn thư viện" : msg,
+        statusKind: isCancelled ? "info" : "error",
+      });
+      return { ok: false, code, dir: "", message: msg, infoHash: "" };
+    }
+  }
+
+  return { start, confirmSubmission };
+})();
+
+const AmaneSettings = (() => {
+  const SETTINGS_ID = "jav-amane-settings";
+
+  function close() {
+    document.getElementById(SETTINGS_ID)?.remove();
+  }
+
+  function message(text, kind = "info") {
+    const el = document.getElementById("am-settings-message");
+    if (el) {
+      el.textContent = text || "";
+      el.style.color = kind === "error" ? "#fca5a5" : kind === "success" ? "#86efac" : "#93c5fd";
+    }
+  }
+
+  function setLibraries(libs, selectedId) {
+    const select = document.getElementById("am-library");
+    const idInput = document.getElementById("am-library-id");
+    if (!select) return;
+    select.textContent = "";
+    const emptyOpt = document.createElement("option");
+    emptyOpt.value = "";
+    emptyOpt.textContent = libs.length ? "Vui lòng chọn thư viện" : "Không có thư viện khả dụng";
+    select.appendChild(emptyOpt);
+    libs.forEach(lib => {
+      const opt = document.createElement("option");
+      opt.value = String(lib.id);
+      opt.textContent = `${lib.name || "Chưa đặt tên"} (#${lib.id})`;
+      select.appendChild(opt);
+    });
+    const targetVal = String(selectedId || idInput?.value || "");
+    if (targetVal) select.value = targetVal;
+    if (idInput && select.value) idInput.value = select.value;
+  }
+
+  async function loadLibraries() {
+    const baseUrl = document.getElementById("am-base")?.value || "";
+    const token = document.getElementById("am-token")?.value || "";
+    const currentId = Number(document.getElementById("am-library-id")?.value) || AmaneConfig.libraryId;
+    message("Đang kết nối tới Amane…");
+    try {
+      const caps = await AmaneApi.capabilities({ baseUrl, token });
+      if (!caps?.available) {
+        setLibraries([], 0);
+        message(caps?.reason || "Amane hiện không khả dụng", "error");
+        return;
+      }
+      const libs = Array.isArray(caps.libraries) ? caps.libraries : [];
+      setLibraries(libs, currentId);
+      if (!libs.length) {
+        message("Amane chưa cấu hình thư viện phương tiện nào", "error");
+        return;
+      }
+      message(`Kết nối thành công! Tìm thấy ${libs.length} thư viện phương tiện.`, "success");
+    } catch (err) {
+      setLibraries([], 0);
+      message(String(err?.message || err || "Kết nối thất bại"), "error");
+    }
+  }
+
+  function save() {
+    const baseUrl = document.getElementById("am-base")?.value || "";
+    const token = document.getElementById("am-token")?.value || "";
+    const libSelect = document.getElementById("am-library");
+    const idInputVal = Number(document.getElementById("am-library-id")?.value) || 0;
+    const finalId = Number(libSelect?.value) || idInputVal;
+    const selectedOpt = libSelect?.selectedOptions?.[0];
+    const libName = finalId && selectedOpt && selectedOpt.value ? selectedOpt.textContent.replace(/\s*\(#\d+\)\s*$/, "") : "";
+
+    AmaneConfig.pushEnabled = !!document.getElementById("am-push-enabled")?.checked;
+    AmaneConfig.askLibraryEachPush = !!document.getElementById("am-ask-library")?.checked;
+    AmaneConfig.baseUrl = baseUrl;
+    AmaneConfig.token = token;
+    AmaneConfig.libraryId = finalId;
+    AmaneConfig.libraryName = libName;
+
+    message(AmaneConfig.pushEnabled ? "Đã lưu cài đặt Amane!" : "Đã lưu cài đặt (Lưu kho Amane đang tắt)", "success");
+    setTimeout(close, 450);
+  }
+
+  function chooseLibrary(libs, selectedId, opts = {}) {
+    const list = Array.isArray(libs) ? libs.filter(x => x && x.id) : [];
+    if (!list.length) return Promise.resolve(null);
+    return new Promise(resolve => {
+      const overlay = document.createElement("div");
+      overlay.id = "jav-amane-library-picker";
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483004;background:rgba(2,6,23,.55);display:flex;align-items:center;justify-content:center;font:13px/1.5 -apple-system,"Microsoft YaHei",sans-serif';
+
+      const modal = document.createElement("div");
+      modal.style.cssText = "width:360px;max-width:calc(100vw - 32px);background:#0f172a;color:#e2e8f0;border:1px solid rgba(148,163,184,.35);border-radius:10px;padding:16px;box-shadow:0 18px 48px rgba(2,6,23,.5)";
+
+      const title = document.createElement("div");
+      title.style.cssText = "font-size:15px;font-weight:700;margin-bottom:10px";
+      title.textContent = opts.title || "Chọn thư viện Amane";
+
+      const select = document.createElement("select");
+      select.style.cssText = "width:100%;box-sizing:border-box;padding:7px 8px;border-radius:6px;border:1px solid rgba(148,163,184,.4);background:#1e293b;color:#e2e8f0";
+      list.forEach(item => {
+        const opt = document.createElement("option");
+        opt.value = String(item.id);
+        opt.textContent = `${item.name || "Chưa đặt tên"} (#${item.id})`;
+        select.appendChild(opt);
+      });
+      if (selectedId) select.value = String(selectedId);
+
+      const rememberLabel = document.createElement("label");
+      rememberLabel.style.cssText = "display:flex;align-items:center;gap:8px;padding:10px 0;color:#94a3b8";
+      const rememberInput = document.createElement("input");
+      rememberInput.type = "checkbox";
+      rememberInput.checked = !!opts.remember;
+      rememberLabel.append(rememberInput, document.createTextNode("Đặt làm thư viện mặc định"));
+
+      const actions = document.createElement("div");
+      actions.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:8px";
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.textContent = "Hủy";
+      cancelBtn.style.cssText = "padding:6px 12px;border-radius:6px;border:1px solid rgba(148,163,184,.4);background:transparent;color:#e2e8f0;cursor:pointer";
+
+      const confirmBtn = document.createElement("button");
+      confirmBtn.type = "button";
+      confirmBtn.textContent = "Xác nhận";
+      confirmBtn.style.cssText = "padding:6px 14px;border-radius:6px;border:1px solid rgba(96,165,250,.6);background:#2563eb;color:#fff;cursor:pointer";
+
+      actions.append(cancelBtn, confirmBtn);
+      modal.append(title, select, rememberLabel, actions);
+      overlay.appendChild(modal);
+
+      const finish = (result) => {
+        overlay.remove();
+        resolve(result);
+      };
+
+      cancelBtn.addEventListener("click", () => finish(null));
+      confirmBtn.addEventListener("click", () => {
+        const found = list.find(it => String(it.id) === select.value) || null;
+        if (found && rememberInput.checked) {
+          AmaneConfig.libraryId = found.id;
+          AmaneConfig.libraryName = found.name || "";
+          AmaneConfig.askLibraryEachPush = false;
+        }
+        finish(found);
+      });
+      overlay.addEventListener("click", e => { if (e.target === overlay) finish(null); });
+      document.body.appendChild(overlay);
+    });
+  }
+
+  function open() {
+    close();
+    const overlay = document.createElement("div");
+    overlay.id = SETTINGS_ID;
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483003;background:rgba(2,6,23,.55);display:flex;align-items:center;justify-content:center;font:13px/1.5 -apple-system,"Microsoft YaHei",sans-serif';
+    overlay.innerHTML = `
+      <div style="width:460px;max-width:calc(100vw - 32px);background:#0f172a;color:#e2e8f0;border:1px solid rgba(148,163,184,.35);border-radius:10px;padding:16px;box-shadow:0 18px 48px rgba(2,6,23,.5)">
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px">Cài đặt lưu kho Amane</div>
+        <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0">
+          <span>Đẩy vào Amane<small style="display:block;color:#94a3b8;font-weight:400">Bật tính năng lưu kho tự động qua Amane</small></span>
+          <input id="am-push-enabled" type="checkbox">
+        </label>
+        <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0">
+          <span>Hỏi thư viện mỗi lần đẩy</span>
+          <input id="am-ask-library" type="checkbox">
+        </label>
+        <label style="display:block;padding:6px 0">Địa chỉ máy chủ Amane
+          <input id="am-base" class="am-input" type="text" placeholder="http://127.0.0.1:8000" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px 8px;border-radius:6px;border:1px solid rgba(148,163,184,.4);background:#1e293b;color:#e2e8f0">
+        </label>
+        <label style="display:block;padding:6px 0">Token tích hợp javxy
+          <input id="am-token" type="password" placeholder="data/secrets/javxy-token" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px 8px;border-radius:6px;border:1px solid rgba(148,163,184,.4);background:#1e293b;color:#e2e8f0">
+        </label>
+        <label style="display:block;padding:6px 0">Thư viện phương tiện
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <select id="am-library" style="flex:1;min-width:0;padding:6px 8px;border-radius:6px;border:1px solid rgba(148,163,184,.4);background:#1e293b;color:#e2e8f0"></select>
+            <input id="am-library-id" type="number" min="1" placeholder="ID" style="width:88px;padding:6px 8px;border-radius:6px;border:1px solid rgba(148,163,184,.4);background:#1e293b;color:#e2e8f0">
+            <button id="am-load" type="button" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(148,163,184,.4);background:rgba(30,41,59,.9);color:#e2e8f0;cursor:pointer">Tải</button>
+          </div>
+        </label>
+        <div id="am-settings-message" style="min-height:20px;padding:6px 0;color:#93c5fd"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+          <button id="am-cancel" type="button" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(148,163,184,.4);background:transparent;color:#e2e8f0;cursor:pointer">Hủy</button>
+          <button id="am-save" type="button" style="padding:6px 14px;border-radius:6px;border:1px solid rgba(96,165,250,.6);background:#2563eb;color:#fff;cursor:pointer">Lưu</button>
+        </div>
+        <div style="margin-top:10px;color:#94a3b8;font-size:11px">Token là token tích hợp javxy của Amane (không phải Token API tài khoản). Địa chỉ chỉ điền gốc (VD: http://127.0.0.1:8000), không kèm /api/integrations/javxy.</div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    document.getElementById("am-push-enabled").checked = AmaneConfig.pushEnabled;
+    document.getElementById("am-ask-library").checked = AmaneConfig.askLibraryEachPush;
+    document.getElementById("am-base").value = AmaneConfig.baseUrl;
+    document.getElementById("am-token").value = AmaneConfig.token;
+    document.getElementById("am-library-id").value = AmaneConfig.libraryId || "";
+
+    document.getElementById("am-library").addEventListener("change", e => {
+      const idInp = document.getElementById("am-library-id");
+      if (idInp && e.target.value) idInp.value = e.target.value;
+    });
+    document.getElementById("am-load").addEventListener("click", loadLibraries);
+    document.getElementById("am-save").addEventListener("click", save);
+    document.getElementById("am-cancel").addEventListener("click", close);
+    overlay.addEventListener("click", e => { if (e.target === overlay) close(); });
+
+    if (AmaneConfig.token) loadLibraries();
+  }
+
+  function register() {
+    Core.expose("__LAOSIJI_AMANE_SETTINGS__", () => open());
+    if (typeof GM_registerMenuCommand === "function") {
+      GM_registerMenuCommand("Cài đặt lưu kho Amane", () => {
+        if (window.top !== window.self) {
+          try {
+            if (typeof window.top.__LAOSIJI_AMANE_SETTINGS__ === "function") {
+              window.top.__LAOSIJI_AMANE_SETTINGS__();
+              return;
+            }
+          } catch {}
+        }
+        open();
+      });
+    }
+  }
+
+  return { open, close, register, chooseLibrary };
+})();
+
  const MagnetActions = (() => {
   const { parseJson } = MagnetApi;
-  async function offline115() {
-   notify('115', 'Chức năng 115 đã được tắt trong bản này.');
+  async function offline115(magnet, options = {}) {
+   if (typeof AmaneConfig !== 'undefined' && AmaneConfig.pushEnabled && AmaneConfig.token) {
+    try {
+     return await AmaneService.start(magnet, options);
+    } catch (err) {
+     const msg = String(err?.message || err || 'Lưu kho Amane thất bại');
+     notify('Lưu kho Amane thất bại', msg);
+     return { ok: false, code: String(options?.code || ''), dir: '', message: msg, infoHash: '' };
+    }
+   }
+   notify('Lưu kho', 'Chức năng 115 đã được tắt trong bản này. Để lưu kho, vui lòng cấu hình Amane trong menu.');
+   return { ok: false, code: String(options?.code || ''), dir: '', message: 'Amane chưa được cấu hình', infoHash: '' };
   }
   function formatBytes(bytes) {
    const num = Number(bytes) || 0;
@@ -4786,9 +5685,9 @@
      e.preventDefault(); MagnetActions.checkWhatslink(item.maglink);
     });
     tdOp.appendChild(checkBtn); tr.appendChild(tdOp); const tdOffline = document.createElement('td'); tdOffline.className = 'nong-115-cell'; const offBtn = document.createElement('a'); offBtn.href = '#'; offBtn.className = 'nong-offline-115';
-    offBtn.textContent = '115';
+    offBtn.textContent = (typeof AmaneConfig !== 'undefined' && AmaneConfig.pushEnabled && AmaneConfig.token) ? 'Amane' : 'Lưu kho';
     offBtn.addEventListener('click', e => {
-     e.preventDefault(); MagnetActions.offline115(item.maglink);
+     e.preventDefault(); MagnetActions.offline115(item.maglink, { code: dnCode || item.title || '' });
     });
     tdOffline.appendChild(offBtn); tr.appendChild(tdOffline); table.appendChild(tr);
    }); }
@@ -4925,7 +5824,13 @@
     setTimeout(() => { copyButton.textContent = 'Sao chép'; }, 900);
    });
    const checkButton = createButton('Kiểm tra', 'laosiji-native-magnet-action laosiji-native-magnet-action-check', () => { MagnetActions.checkWhatslink(item.maglink); });
-   actions.append(copyButton, checkButton); }
+   actions.append(copyButton, checkButton);
+   if (typeof AmaneConfig !== 'undefined' && AmaneConfig.pushEnabled && AmaneConfig.token) {
+    const amaneButton = createButton('Lưu kho Amane', 'laosiji-native-magnet-action laosiji-native-magnet-action-amane', () => {
+     MagnetActions.offline115(item.maglink, { code: item.code || item.title || '' });
+    });
+    actions.append(amaneButton);
+   } }
   function appendActions(actions, item) {
    if (item.assistant?.group) { item.assistant.group._laosijiNativeOrigin = item.assistant; actions.appendChild(item.assistant.group); return; }
    appendFallbackActions(actions, item); }
@@ -9800,11 +10705,18 @@
   getTrailerCacheEnabled() { return true; },
   getTrailerProxyPlaybackEnabled() { return CFG.trailerProxyPlayback; },
   getDefaultSearchEngine(code = '') {
-   const fc2Engine = SearchEngines.find(engine => engine.fc2Only && engine.isAvailable?.(code));
-   if (fc2Engine) return fc2Engine;
-   const defaultIndex = SearchEngines.findIndex(engine => engine.name === 'AVBase'); const index = readStoredValue('default_search_engine', defaultIndex >= 0 ? defaultIndex : SearchEngines.length - 1); const configured = SearchEngines[index];
-   const fallback = SearchEngines.find(engine => engine.name === 'AVBase' && !engine.isAvailable) || SearchEngines.find(engine => !engine.isAvailable) || SearchEngines[0];
-   return configured?.isAvailable && !configured.isAvailable(code) ? fallback : configured || fallback; },
+   const allowed = new Set(['google', 'bing', 'duckgo']);
+   const preferred = readStoredValue('jump_preferred_search', '');
+   if (allowed.has(preferred)) {
+    const engine = SearchEngines.find(item => item.key === preferred);
+    if (engine) return engine;
+   }
+   const legacyList = ['BTDigg', 'Taocili', 'Google', 'Bing', 'DuckGo', 'AVBase'];
+   const legacyIndex = parseInt(readStoredValue('default_search_engine', -1), 10);
+   const legacyName = legacyList[legacyIndex];
+   const mappedKey = { Google: 'google', Bing: 'bing', DuckGo: 'duckgo' }[legacyName] || 'duckgo';
+   return SearchEngines.find(item => item.key === mappedKey) || SearchEngines.find(item => item.key === 'duckgo') || SearchEngines[0];
+  },
   getDefaultVideoEngine() { return readStoredValue('default_video_engine', 'missav'); },
   getVideoEngines() { return VIDEO_ENGINES; },
   getSourceOrder() { return readStoredValue('thumb_source_order', ['javfree', 'projectjav', 'javstore']); } };
@@ -12449,78 +13361,219 @@ function bindJumpMenu(menuDiv, toggleBtn, subMenu, mainBtn = null) {
    subMenu.appendChild(btn);
   });
   menuDiv.appendChild(subMenu); bindJumpMenu(menuDiv, toggleBtn, subMenu, mainBtn); return menuDiv; }
- function addNyaaBtn(code, container, useCapture = false) {
-  if (!readStoredValue('btn_show_nyaa', true)) return;
-  if (/sukebei\.nyaa/i.test(location.hostname)) return;
-  const btn = Utils.createJumpLinkBtn('🔍 Sukebei', '#17a2b8', `https://sukebei.nyaa.si/?f=0&c=0_0&q=${encodeURIComponent(code)}`);
-  container.appendChild(btn); }
- function addJavbusBtn(code, container, useCapture = false) {
-  if (!readStoredValue('btn_show_javbus', true)) return;
-  if (isJavBusHost()) return;
-  const url = Utils.getJavBusUrl(code); const btn = Utils.createJumpLinkBtn('🎬 JavBus', '#007bff', url); container.appendChild(btn); }
- function addJavdbBtn(code, container, useCapture = false) {
-  if (!readStoredValue('btn_show_javdb', true)) return;
-  if (isJavDbHost()) return;
-  const btn = Utils.createJumpLinkBtn('📀 JavDB', '#6f42c1', `https://javdb.com/search?q=${encodeURIComponent(code)}`);
-  container.appendChild(btn); }
- function getFc2CmaArticleUrl(code) {
-  const fc2Number = Utils.getFc2Number(code);
-  return fc2Number ? `https://fc2cmadb.com/articles/${fc2Number}` : '';
- }
- function getMissavSlug(code) {
-  const codeLower = String(code || '').trim().toLowerCase(); const fc2Number = Utils.getFc2Number(code);
-  if (fc2Number) return `fc2-ppv-${fc2Number}`;
-  const gachiMatch = codeLower.match(/^gachi[-_](\d+)$/);
-  if (gachiMatch) return `gachi${gachiMatch[1]}`;
-  const dateNumberMatch = codeLower.match(/^(\d{6})([_-])(\d{2,3})$/);
-  if (dateNumberMatch) {
-   const [, date, separator, serial] = dateNumberMatch; const prefix = serial.length === 2 ? 'musume' : serial === '100' ? 'pacopacomama' : separator === '_' ? 'pondo' : 'caribbeancom';
-   return `${prefix}-${date}${separator}${serial}`;
+
+const JumpCatalog = (() => {
+  const CATEGORIES = [
+    { key: "threeSites", label: "3 trang lớn" },
+    { key: "magnet", label: "Tìm magnet" },
+    { key: "database", label: "Cơ sở dữ liệu" },
+    { key: "video", label: "Trang xem video" },
+    { key: "search", label: "Tìm kiếm ngoài" },
+  ];
+
+  function currentHost() {
+    return typeof location !== "undefined" ? String(location.hostname || "") : "";
   }
-  return codeLower .replace(/^10musume-/, 'musume-') .replace(/^1pondo-/, 'pondo-') .replace(/^heyzo_/, 'heyzo-'); }
- function addMissAVBtn(code, container, useCapture = false) {
-  const showMissav = readStoredValue('btn_show_missav', true);
-  if (!showMissav) return;
-  const codeLower = String(code || '').trim().toLowerCase(); const codeCompactLower = codeLower.replace(/-/g, ''); const fc2Number = Utils.getFc2Number(code);
-  const fc2Slug = fc2Number ? `fc2-ppv-${fc2Number}` : '';
-  const fc2JavdaySlug = fc2Number ? `FC2PPV${fc2Number}` : '';
-  const code123AvSlug = typeof Javdb123AvPlayer !== 'undefined' ? Javdb123AvPlayer.getSlug(code) : (fc2Slug || codeLower); const get123AvLocalePrefix = () => typeof Javdb123AvPlayer !== 'undefined' ? Javdb123AvPlayer.getLocalePrefix(location.href) : '/cn';
-  const videoUrlMap = {
-   missav: fc2Number ? `https://missav123.com/${fc2Slug}` : `https://missav123.com/cn/${getMissavSlug(code)}`,
-   jable: `https://jable.tv/videos/${codeLower}/`,
-   '123av': `https://123av.com${get123AvLocalePrefix()}/v/${code123AvSlug}`,
-   javday: fc2JavdaySlug ? `https://javday.app/index.php/videos/${fc2JavdaySlug}/` : `https://javday.app/videos/${codeCompactLower}/`,
-   supjav: `https://supjav.com/zh/?s=${encodeURIComponent(fc2Number || code)}`,
-   javrate: `https://www.javrate.com/search/${encodeURIComponent(codeLower)}`,
+
+  function readSetting(key, fallback, legacyKey) {
+    try {
+      const val = readStoredValue(key, null);
+      if (typeof val === "boolean") return val;
+      return legacyKey ? readStoredValue(legacyKey, fallback) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function isFc2(code) {
+    return !!Utils.getFc2Number(code);
+  }
+
+  function javdbHost() {
+    return String(CFG?.javdbSearchUrl || "javdb.com").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "") || "javdb.com";
+  }
+
+  function fc2CmaUrl(code) {
+    const fc2Num = Utils.getFc2Number(code);
+    return fc2Num ? `https://fc2cmadb.com/articles/${fc2Num}` : "";
+  }
+
+  function missavSlug(code) {
+    const str = String(code || "").trim().toLowerCase();
+    const fc2Num = Utils.getFc2Number(code);
+    if (fc2Num) return `fc2-ppv-${fc2Num}`;
+    const gachi = str.match(/^gachi[-_](\d+)$/);
+    if (gachi) return `gachi${gachi[1]}`;
+    const hit = str.match(/^(\d{6})([_-])(\d{2,3})$/);
+    if (hit) {
+      const [, date, sep, num] = hit;
+      const brand = num.length === 2 ? "musume" : num === "100" ? "pacopacomama" : sep === "_" ? "pondo" : "caribbeancom";
+      return `${brand}-${date}${sep}${num}`;
+    }
+    return str.replace(/^10musume-/, "musume-").replace(/^1pondo-/, "pondo-").replace(/^heyzo_/, "heyzo-");
+  }
+
+  function videoUrlMap(code) {
+    const normalized = String(code || "").trim().toLowerCase();
+    const compact = normalized.replace(/-/g, "");
+    const fc2Num = Utils.getFc2Number(code);
+    const fc2Missav = fc2Num ? `fc2-ppv-${fc2Num}` : "";
+    const fc2Javday = fc2Num ? `FC2PPV${fc2Num}` : "";
+    const slug123 = typeof Javdb123AvPlayer !== "undefined" && Javdb123AvPlayer.getSlug ? Javdb123AvPlayer.getSlug(code) : fc2Missav || normalized;
+    const prefix123 = typeof Javdb123AvPlayer !== "undefined" && Javdb123AvPlayer.getSlug ? Javdb123AvPlayer.getLocalePrefix(typeof location !== "undefined" ? location.href : "") : "/cn";
+    return {
+      missav: fc2Num ? `https://missav123.com/${fc2Missav}` : `https://missav123.com/cn/${missavSlug(code)}`,
+      jable: `https://jable.tv/videos/${normalized}/`,
+      "123av": `https://123av.com${prefix123}/v/${slug123}`,
+      javday: fc2Javday ? `https://javday.app/index.php/videos/${fc2Javday}/` : `https://javday.app/videos/${compact}/`,
+      supjav: `https://supjav.com/zh/?s=${encodeURIComponent(fc2Num || code)}`,
+      javrate: `https://www.javrate.com/search/${encodeURIComponent(normalized)}`,
+    };
+  }
+
+  function searchEngine(key) {
+    return SearchEngines.find(item => item.key === key);
+  }
+
+  function providerList(code, opts = {}) {
+    const host = opts.hostname || currentHost();
+    const fc2 = isFc2(code);
+    const list = [];
+    const add = (item) => {
+      if (item && item.url && (!item.host || !item.host.test(host))) {
+        list.push(item);
+      }
+    };
+
+    // threeSites
+    if (readSetting("btn_show_javbus", true) && !isJavBusHost(host)) {
+      add({ key: "javbus", label: "JavBus", category: "threeSites", color: "#007bff", url: Utils.getJavBusUrl(code) });
+    }
+    if (readSetting("btn_show_javdb", true) && !isJavDbHost(host)) {
+      add({ key: "javdb", label: "JavDB", category: "threeSites", color: "#6f42c1", url: `https://${javdbHost()}/search?q=${encodeURIComponent(code)}` });
+    }
+    if (readSetting("btn_show_javlibrary", true) && !isJavLibraryHost(host)) {
+      add({ key: "javlibrary", label: "JavLibrary", category: "threeSites", color: "#b45309", url: `https://www.javlibrary.com/cn/vl_searchbyid.php?keyword=${encodeURIComponent(code)}` });
+    }
+
+    // magnet
+    if (readSetting("btn_show_nyaa", true)) {
+      add({ key: "sukebei", label: "Sukebei", category: "magnet", color: "#17a2b8", host: /sukebei\.nyaa/i, url: `https://sukebei.nyaa.si/?f=0&c=0_0&q=${encodeURIComponent(code)}` });
+    }
+    if (readSetting("btn_show_torrent_search", true, "btn_show_search")) {
+      const btdig = searchEngine("btdig");
+      const taocili = searchEngine("taocili");
+      if (btdig) add({ key: "btdig", label: btdig.name, category: "magnet", color: btdig.color, host: /(?:^|\.)btdig\.com$/i, url: btdig.url(code) });
+      if (taocili) add({ key: "taocili", label: taocili.name, category: "magnet", color: taocili.color, host: /(?:^|\.)taocili\.com$/i, url: taocili.url(code) });
+    }
+
+    // database
+    if (fc2) {
+      const fd2ppv = searchEngine("fd2ppv");
+      if (readSetting("btn_show_fd2ppv", true, "btn_show_search") && fd2ppv) {
+        add({ key: "fd2ppv", label: fd2ppv.name, category: "database", color: fd2ppv.color, host: /(?:^|\.)fd2ppv\.cc$/i, url: fd2ppv.url(code) });
+      }
+      if (readSetting("btn_show_fc2cma", true, "btn_show_fanza")) {
+        add({ key: "fc2cma", label: "FC2CMA", category: "database", color: "#2563eb", host: /(?:^|\.)fc2cmadb\.com$/i, url: fc2CmaUrl(code) });
+      }
+    } else {
+      const avbase = searchEngine("avbase");
+      if (readSetting("btn_show_avbase", true, "btn_show_search") && avbase) {
+        add({ key: "avbase", label: avbase.name, category: "database", color: avbase.color, host: /(?:^|\.)avbase\.net$/i, url: avbase.url(code) });
+      }
+      if (readSetting("btn_show_fanza", true)) {
+        add({ key: "fanza", label: "FANZA", category: "database", color: "#c0392b", host: /(?:^|\.)dmm\.co\.jp$/i, url: `https://www.dmm.co.jp/mono/-/search/=/searchstr=${encodeURIComponent(code)}/` });
+      }
+    }
+
+    // video
+    if (readSetting("btn_show_missav", true)) {
+      const vUrls = videoUrlMap(code);
+      Settings.getVideoEngines().forEach(item => {
+        add({ key: item.key, label: item.label, category: "video", color: item.color, host: item.host, url: vUrls[item.key] });
+      });
+    }
+
+    // search
+    if (readSetting("btn_show_search", true)) {
+      ["google", "bing", "duckgo"].forEach(engKey => {
+        const eng = searchEngine(engKey);
+        if (eng) {
+          add({ key: engKey, label: eng.name, category: "search", color: eng.color, host: new RegExp(engKey === "duckgo" ? "duckduckgo\\.com" : `${engKey}\\.com`, "i"), url: eng.url(code) });
+        }
+      });
+    }
+
+    return list;
+  }
+
+  function preferredKey(catKey, code) {
+    if (catKey === "threeSites") return readStoredValue("jump_preferred_three_site", "javbus");
+    if (catKey === "magnet") return readStoredValue("jump_preferred_magnet", "sukebei");
+    if (catKey === "database") {
+      return isFc2(code) ? readStoredValue("jump_preferred_database_fc2", "fd2ppv") : readStoredValue("jump_preferred_database", "avbase");
+    }
+    if (catKey === "video") return Settings.getDefaultVideoEngine();
+    if (catKey === "search") return (Settings.getDefaultSearchEngine(code).key || "duckgo");
+    return "";
+  }
+
+  function ordered(items, pref) {
+    const idx = items.findIndex(item => item.key === pref);
+    return idx <= 0 ? items : [items[idx], ...items.slice(0, idx), ...items.slice(idx + 1)];
+  }
+
+  function categories(code, opts = {}) {
+    const allProviders = providerList(code, opts);
+    return CATEGORIES.map(cat => {
+      const items = ordered(allProviders.filter(item => item.category === cat.key), preferredKey(cat.key, code));
+      return { ...cat, items };
+    }).filter(cat => cat.items.length);
+  }
+
+  function provider(key, code, opts = {}) {
+    return providerList(code, opts).find(item => item.key === key) || null;
+  }
+
+  return {
+    categories,
+    provider,
+    fc2CmaUrl,
+    missavSlug,
+    videoUrlMap,
   };
-  const enabledVideoKeys = new Set([ ...(showMissav ? ['missav', 'jable', '123av', 'javday', 'supjav', 'javrate'] : []),
-  ]);
-  const videoButtons = Settings.getVideoEngines() .filter(item => enabledVideoKeys.has(item.key) && !item.host.test(location.hostname)) .map(item => ({ ...item, url: videoUrlMap[item.key] })) .filter(item => item.url);
-  if (!videoButtons.length) return;
-  const defaultKey = Settings.getDefaultVideoEngine(); const mainItem = videoButtons.find(item => item.key === defaultKey) || videoButtons[0]; const subItems = videoButtons.filter(item => item !== mainItem);
-  const createVideoBtn = item => Utils.createJumpLinkBtn(`🎬 ${item.label}`, item.color, item.url);
-  if (!subItems.length) { container.appendChild(createVideoBtn(mainItem)); return; }
-  container.appendChild(createJumpMenu({
-   accent: mainItem.color,
-   className: 'missav-menu',
-   mainBtn: createVideoBtn(mainItem),
-   subButtons: subItems.map(createVideoBtn),
-   toggleTitle: 'Mở rộng trang tương tự',
-  })); }
- function addDmmBtn(code, container, useCapture = false) {
-  if (!readStoredValue('btn_show_fanza', true)) return;
-  const fc2CmaUrl = getFc2CmaArticleUrl(code);
-  if (fc2CmaUrl) {
-   if (/(?:^|\.)fc2cmadb\.com$/i.test(location.hostname)) return;
-   const btn = typeof Utils.createJumpLinkBtn === 'function' ? Utils.createJumpLinkBtn('▶ FC2CMA', '#2563eb', fc2CmaUrl) : Utils.createBtn('▶ FC2CMA', '#2563eb', () => {
-     window.open(fc2CmaUrl);
-    }, useCapture);
-   btn.classList?.add('jav-fc2cma-btn'); container.appendChild(btn); return; }
-  const fanzaUrl = `https://www.dmm.co.jp/mono/-/search/=/searchstr=${encodeURIComponent(code)}/`;
-  const btn = typeof Utils.createJumpLinkBtn === 'function' ? Utils.createJumpLinkBtn('▶ FANZA', '#c0392b', fanzaUrl) : Utils.createBtn('▶ FANZA', '#c0392b', () => {
-    window.open(fanzaUrl);
-   }, useCapture);
-  container.appendChild(btn); }
+})();
+Core.expose("__LAOSIJI_JUMP_CATALOG__", JumpCatalog);
+
+function addJumpCategories(code, container) {
+  if (!container || typeof JumpCatalog === "undefined" || !JumpCatalog) return;
+  JumpCatalog.categories(code, { hostname: location.hostname }).forEach(category => {
+    const items = category.items || [];
+    if (!items.length) return;
+    const mainItem = items[0];
+    const createJumpBtn = (item) => {
+      const btn = Utils.createJumpLinkBtn(item.label, item.color, item.url);
+      if (item.key === "fc2cma") btn.classList?.add("jav-fc2cma-btn");
+      return btn;
+    };
+    const mainBtn = createJumpBtn(mainItem);
+    if (items.length === 1) {
+      container.appendChild(mainBtn);
+      return;
+    }
+    const menu = createJumpMenu({
+      accent: mainItem.color,
+      className: `jump-category-menu jump-category-${category.key}`,
+      mainBtn,
+      subButtons: items.slice(1).map(createJumpBtn),
+      toggleTitle: `Mở rộng ${category.label}`,
+    });
+    menu.dataset.jumpCategory = category.key;
+    container.appendChild(menu);
+  });
+}
+
+ function getFc2CmaArticleUrl(code) { return JumpCatalog.fc2CmaUrl(code); }
  function addSubtitleBtn(code, container, useCapture = false) {
   if (!readStoredValue('btn_show_subtitle', true)) return;
   const btn = Utils.createBtn('📝 Phụ đề', '#0f766e', async () => {
@@ -12562,22 +13615,7 @@ function bindJumpMenu(menuDiv, toggleBtn, subMenu, mainBtn = null) {
    await Thumbnail.show(code);
   }, useCapture);
   btn.classList.add('jav-preview-btn'); container.appendChild(btn); }
- function addSearchMenu(code, container, useCapture = false) {
-  if (!readStoredValue('btn_show_search', true)) return;
-  const availableEngines = getAvailableSearchEngines(code); const defaultEngine = Settings.getDefaultSearchEngine(code);
-  const mainBtn = Utils.createBtn(`🔍 ${defaultEngine.name}`, defaultEngine.color, () => {
-   window.open(defaultEngine.url(code));
-  }, useCapture);
-  const subButtons = availableEngines .filter(engine => engine.name !== defaultEngine.name)
-   .map(engine => Utils.createBtn(`🔍 ${engine.name}`, engine.color, () => {
-    window.open(engine.url(code));
-   }, useCapture));
-  container.appendChild(createJumpMenu({
-   accent: defaultEngine.color,
-   mainBtn,
-   subButtons,
-   toggleTitle: 'Mở rộng công cụ tìm kiếm',
-  })); }
+ function addSearchMenu(code, container, useCapture = false) {}
  function addSettingsBtn(container, useCapture = false) {
   if (!container || container.querySelector('.jav-settings-btn')) return;
   const btn = Utils.createBtn('⚙️ Cài đặt', '#475569', () => {
@@ -12903,23 +13941,8 @@ function bindJumpMenu(menuDiv, toggleBtn, subMenu, mainBtn = null) {
   const trailerCode = typeof site.getCode === 'function' ? code : Utils.extractCode(titleText, { keepUncensoredSource: true }) || code;
   const btnGroup = document.createElement('div'); btnGroup.className = 'jav-jump-btn-group'; btnGroup.dataset.laosijiJump = '1'; btnGroup.dataset.code = code;
   if (site.id === 'fc2cmadb') { btnGroup.classList.add('fc2cmadb-jump-group'); insertAvidCopyBtn(titleElem, code, null, true); }
-  addNyaaBtn(code, btnGroup); addJavbusBtn(code, btnGroup); addJavdbBtn(code, btnGroup); addMissAVBtn(code, btnGroup); addDmmBtn(code, btnGroup);
-  if (site.id === 'missav') {
-   const availableEngines = getAvailableSearchEngines(code); const defaultEngine = Settings.getDefaultSearchEngine(code);
-   const mainSearchBtn = Utils.createLinkBtn(`🔍 ${defaultEngine.name}`, defaultEngine.color, defaultEngine.url(code));
-   const subButtons = availableEngines .filter(engine => engine.name !== defaultEngine.name)
-    .map(engine => Utils.createLinkBtn(`🔍 ${engine.name}`, engine.color, engine.url(code)));
-   btnGroup.appendChild(createJumpMenu({
-    accent: defaultEngine.color,
-    mainBtn: mainSearchBtn,
-    subButtons,
-    toggleTitle: 'Mở rộng công cụ tìm kiếm',
-    stretchSubButtons: false,
-   }));
-  } else {
-   addSearchMenu(code, btnGroup);
-   if (site.id === 'javlibrary' || ['javbus', 'javdb', 'supjav', 'jable'].includes(site.id)) { addJumpLineBreak(btnGroup); }
-  }
+  addJumpCategories(code, btnGroup);
+  if (site.id === 'javlibrary' || ['javbus', 'javdb', 'supjav', 'jable'].includes(site.id)) { addJumpLineBreak(btnGroup); }
   addPan115PlayBtn(Pan115.extractCode(site.id === 'fc2cmadb' ? code : titleText, code), btnGroup); addSubtitleBtn(code, btnGroup); addTrailerBtn(trailerCode, btnGroup); addPreviewBtn(code, btnGroup); addSettingsBtn(btnGroup);
   if (site.id === 'javlibrary') {
    btnGroup.querySelectorAll('a').forEach(btn => {
@@ -13409,6 +14432,7 @@ function bindJumpMenu(menuDiv, toggleBtn, subMenu, mainBtn = null) {
    start(); },
   _start() {
    if (isJavDbHost()) SiteJavDB.ensureHomeReleaseSort?.();
+   if (typeof AmaneSettings !== 'undefined' && AmaneSettings?.register) AmaneSettings.register();
    MobilePolicy.start(); MobileSettingsEntry.install(); Pan115SettingsEntry.install(); CardFx.apply(MobilePolicy.featureEnabled('cardFx', CFG.cardFx)); Trailer.installFallbackDebugHelper(); this.initRuntimeObserver(); this.initNavigationHooks();
    JavdbAppCover.start?.(); SiteManager.setupJavDbGuards(); StillsGallery.start?.();
    if (isJavDbHost() && location.pathname.startsWith('/v/')) {
