@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JAV Lái Xe - Mới
 // @namespace    https://github.com/LHViet245/scripts
-// @version      2.9.5.3-vi
+// @version      2.9.5.4-vi
 // @description  Tăng cường duyệt web và quản lý tài nguyên JAV: Thống nhất nhận diện mã phim, thao tác trang chi tiết và danh sách trên JavBus, JavDB, JavLibrary, hỗ trợ tùy chỉnh tỷ lệ bố cục; cung cấp tổng hợp magnet, khớp phát 115, đổi tên và xóa trên 115, phát phim đầy đủ, tải và xem trailer đa độ phân giải, ảnh xem trước, tải ảnh bìa 2K HD, ảnh bìa JavDB không watermark, chuyển hướng tìm kiếm liên trang, dịch tiêu đề, bố cục thẻ, thu phóng trang, thích ứng di động, xem ảnh phim, cuộn vô tận và sắp xếp theo điểm/đánh giá JavDB; hỗ trợ Trung tâm quản lý tài nguyên độc lập cho từng phân trang JavBus, JavDB, JavLibrary, thao tác hàng loạt diễn viên, tác phẩm, lịch sử đánh giá, danh sách đen cùng sao lưu/khôi phục cục bộ/WebDAV, và cung cấp lối tắt truy cập nhanh cho Sukebei, MissAV, Jable, 123AV, Emby và các trang khác.
 // @author       ZiPenOk
 // @icon         https://cloudflare-imgbed-5nw.pages.dev/file/1778560196416_laosiji.png
@@ -73,7 +73,7 @@
    return url.searchParams.get('laosiji_123av_fc2') === '1';
   } catch (_) { return false; } }
  function isCustomSpaUrl(urlLike) { return isJavdbCustomSpaUrl(urlLike) || is123AvFc2SpaUrl(urlLike); }
- const SCRIPT_VERSION = '2.9.5.3-vi'; const DEBUG_LOG = false; const ERROR_LOG = true; const PAGE_ZOOM_DEFAULT = 86; const PAGE_ZOOM_LOW_RES_DEFAULT = 100; const PAGE_ZOOM_2K_WIDTH = 2560;
+ const SCRIPT_VERSION = '2.9.5.4-vi'; const DEBUG_LOG = false; const ERROR_LOG = true; const PAGE_ZOOM_DEFAULT = 86; const PAGE_ZOOM_LOW_RES_DEFAULT = 100; const PAGE_ZOOM_2K_WIDTH = 2560;
  const getPageZoomDefault = () => {
   const screenLongSide = Math.max(window.screen?.width || 0, window.screen?.height || 0); return screenLongSide && screenLongSide < PAGE_ZOOM_2K_WIDTH ? PAGE_ZOOM_LOW_RES_DEFAULT : PAGE_ZOOM_DEFAULT; };
  const JAVDB_REVIEW_INITIAL_LIMIT = 6; const JAVDB_REVIEW_MORE_LIMIT = 20;
@@ -13573,6 +13573,20 @@ function addJumpCategories(code, container) {
   });
 }
 
+ function getMissavSlug(code) {
+  const codeLower = String(code || '').trim().toLowerCase();
+  const fc2Number = Utils.getFc2Number(code);
+  if (fc2Number) return `fc2-ppv-${fc2Number}`;
+  const gachiMatch = codeLower.match(/^gachi[-_](\d+)$/);
+  if (gachiMatch) return `gachi${gachiMatch[1]}`;
+  const dateNumberMatch = codeLower.match(/^(\d{6})([_-])(\d{2,3})$/);
+  if (dateNumberMatch) {
+   const [, date, separator, serial] = dateNumberMatch;
+   const prefix = serial.length === 2 ? 'musume' : serial === '100' ? 'pacopacomama' : separator === '_' ? 'pondo' : 'caribbeancom';
+   return `${prefix}-${date}${separator}${serial}`;
+  }
+  return codeLower.replace(/^10musume-/, 'musume-').replace(/^1pondo-/, 'pondo-').replace(/^heyzo_/, 'heyzo-');
+}
  function getFc2CmaArticleUrl(code) { return JumpCatalog.fc2CmaUrl(code); }
  function addSubtitleBtn(code, container, useCapture = false) {
   if (!readStoredValue('btn_show_subtitle', true)) return;
