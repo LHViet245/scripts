@@ -1,0 +1,19 @@
+{
+  "upstream": {
+    "remote": "upstream",
+    "branch": "main",
+    "file": "laosiji-amane.js"
+  },
+  "output": "../../laosiji-new.js",
+  "revision": 0,
+  "header": {
+    "name": "JAV Lái Xe - Mới",
+    "namespace": "https://github.com/LHViet245/scripts",
+    "description": "Tăng cường duyệt web và quản lý tài nguyên JAV (bản Việt hoá, đã tắt 115): thống nhất nhận diện mã phim, thao tác trang chi tiết và danh sách trên JavBus, JavDB, JavLibrary, tuỳ chỉnh tỷ lệ bố cục; tổng hợp magnet, lưu kho Amane, phát phim đầy đủ, phát và tải trailer nhiều chất lượng, ảnh xem trước ba nguồn, tải ảnh bìa 2K, ảnh bìa JavDB không watermark, chuyển hướng tìm kiếm liên trang, dịch tiêu đề, bố cục thẻ, thu phóng trang, thích ứng di động, xem ảnh phim, cuộn vô tận và sắp xếp theo điểm/đánh giá JavDB; trung tâm quản lý tài nguyên riêng cho JavBus, JavDB, JavLibrary (diễn viên, tác phẩm, lịch sử đánh giá, danh sách đen, sao lưu/khôi phục) và lối tắt tới Sukebei, MissAV, Jable, 123AV, Emby.",
+    "homepageURL": "https://github.com/LHViet245/scripts",
+    "supportURL": "https://github.com/LHViet245/scripts/issues",
+    "downloadURL": "https://raw.githubusercontent.com/LHViet245/scripts/main/laosiji-new.js",
+    "updateURL": "https://raw.githubusercontent.com/LHViet245/scripts/main/laosiji-new.js",
+    "dropMatch": "115\\.com"
+  }
+}
