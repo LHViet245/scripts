@@ -1,0 +1,19 @@
+{
+  "name": "laosiji-vi",
+  "private": true,
+  "type": "module",
+  "description": "Dựng laosiji-new.js (bản Việt hoá, tắt 115) tự động từ bản build upstream ZiPenOk/scripts",
+  "scripts": {
+    "build": "node build.mjs",
+    "report": "node build.mjs --report-only",
+    "strict": "node build.mjs --strict",
+    "smoke": "node test/smoke.mjs"
+  },
+  "dependencies": {
+    "acorn": "8.12.1",
+    "acorn-walk": "8.3.4"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}
